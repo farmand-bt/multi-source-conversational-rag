@@ -205,3 +205,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Context Markdown files
+CLAUDE.md
+multi-source-rag-project-plan-prompt1.md
+
+# Project-specific
+data/
+.chroma/

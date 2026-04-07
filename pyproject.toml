@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "multi-source-conversational-rag"
+version = "0.1.0"
+description = "Conversational RAG assistant with multi-source ingestion, semantic search, and context-aware memory"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain>=0.3",
+    "langchain-community>=0.3",
+    "langchain-openai>=0.2",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "pymupdf>=1.24",
+    "trafilatura>=1.12",
+    "youtube-transcript-api>=0.6",
+    "streamlit>=1.39",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6",
+    "pytest>=8.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "rag*", "config*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
