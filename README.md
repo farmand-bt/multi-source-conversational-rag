@@ -2,6 +2,14 @@
 
 Conversational RAG assistant that lets you ingest documents from PDFs, web URLs, and YouTube transcripts, then ask natural-language questions with multi-turn memory and source citations.
 
+## What works now
+
+- **PDF ingestion** — upload a PDF from the sidebar; pages are extracted, chunked, and embedded into a local ChromaDB vector store.
+- **Q&A with citations** — ask a question; the top-5 most relevant chunks are retrieved and sent to the LLM, which answers with `[Source: name, page N]` citations rendered in the UI.
+- **Source management** — view all ingested sources with chunk counts and delete them individually.
+
+Web URL and YouTube ingestion, multi-turn memory, and query rewriting are coming in later milestones.
+
 ## Setup
 
 Requires [uv](https://docs.astral.sh/uv/). Install it with `pip install uv` or see the uv docs for other options.
