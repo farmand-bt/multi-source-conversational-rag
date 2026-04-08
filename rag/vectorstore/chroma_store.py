@@ -1,15 +1,109 @@
-from rag.ingestion.base import Document
+import chromadb
 
-# Milestone 2: Implement ChromaDB operations persisted at CHROMA_PERSIST_DIR.
-# Methods: add(documents), query(embedding, top_k) -> list[Document], delete(source_id).
+from config.settings import CHROMA_PERSIST_DIR
+from rag.ingestion.base import Document
 
 
 class ChromaStore:
-    def add(self, documents: list[Document]) -> None:
-        raise NotImplementedError("ChromaStore implemented in Milestone 2")
+    """ChromaDB wrapper. Embeddings are computed externally and passed in explicitly."""
 
-    def query(self, embedding: list[float], top_k: int) -> list[Document]:
-        raise NotImplementedError("ChromaStore implemented in Milestone 2")
+    _COLLECTION = "documents"
+
+    def __init__(self) -> None:
+        self._client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+        # cosine similarity is standard for sentence-transformer embeddings
+        self._collection = self._client.get_or_create_collection(
+            name=self._COLLECTION,
+            metadata={"hnsw:space": "cosine"},
+        )
+
+    # ------------------------------------------------------------------
+    # Write
+    # ------------------------------------------------------------------
+
+    def add(self, chunks: list[Document], embeddings: list[list[float]]) -> None:
+        if not chunks:
+            return
+        self._collection.upsert(
+            ids=[f"{c.source_id}_{c.chunk_index}" for c in chunks],
+            documents=[c.text for c in chunks],
+            metadatas=[self._to_metadata(c) for c in chunks],
+            embeddings=embeddings,
+        )
 
     def delete(self, source_id: str) -> None:
-        raise NotImplementedError("ChromaStore implemented in Milestone 2")
+        self._collection.delete(where={"source_id": source_id})
+
+    # ------------------------------------------------------------------
+    # Read
+    # ------------------------------------------------------------------
+
+    def query(self, embedding: list[float], top_k: int) -> list[Document]:
+        count = self._collection.count()
+        if count == 0:
+            return []
+        results = self._collection.query(
+            query_embeddings=[embedding],
+            n_results=min(top_k, count),
+            include=["documents", "metadatas"],
+        )
+        docs = results.get("documents") or []
+        metas = results.get("metadatas") or []
+        if not docs or not docs[0]:
+            return []
+        return [
+            self._from_metadata(text, meta)
+            for text, meta in zip(docs[0], metas[0])
+        ]
+
+    def list_sources(self) -> list[dict]:
+        results = self._collection.get(include=["metadatas"])
+        sources: dict[str, dict] = {}
+        for meta in (results.get("metadatas") or []):
+            sid = meta["source_id"]
+            if sid not in sources:
+                sources[sid] = {
+                    "source_id": sid,
+                    "source_name": meta.get("source_name", "unknown"),
+                    "source_type": meta.get("source_type", "unknown"),
+                    "ingested_at": meta.get("ingested_at", ""),
+                    "chunk_count": 0,
+                }
+            sources[sid]["chunk_count"] += 1
+        return list(sources.values())
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _to_metadata(doc: Document) -> dict:
+        """Convert Document to a flat metadata dict (no None values — ChromaDB rejects them)."""
+        meta: dict = {
+            "source_type": doc.source_type,
+            "source_name": doc.source_name,
+            "source_id": doc.source_id,
+            "chunk_index": doc.chunk_index,
+            "ingested_at": doc.ingested_at,
+        }
+        if doc.page_number is not None:
+            meta["page_number"] = doc.page_number
+        if doc.url is not None:
+            meta["url"] = doc.url
+        if doc.timestamp is not None:
+            meta["timestamp"] = doc.timestamp
+        return meta
+
+    @staticmethod
+    def _from_metadata(text: str, meta: dict) -> Document:
+        return Document(
+            text=text,
+            source_type=meta["source_type"],
+            source_name=meta["source_name"],
+            source_id=meta["source_id"],
+            chunk_index=meta["chunk_index"],
+            ingested_at=meta.get("ingested_at", ""),
+            page_number=meta.get("page_number"),
+            url=meta.get("url"),
+            timestamp=meta.get("timestamp"),
+        )

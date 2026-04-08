@@ -11,6 +11,7 @@ dependencies = [
     "langchain>=0.3",
     "langchain-community>=0.3",
     "langchain-openai>=0.2",
+    "langchain-text-splitters>=0.3",
     "chromadb>=0.5",
     "sentence-transformers>=3.0",
     "pymupdf>=1.24",

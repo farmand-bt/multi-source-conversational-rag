@@ -1,0 +1,6 @@
+[server]
+# "none" disables the file watcher entirely (uses NoOpSourcesWatcher), which
+# prevents Streamlit from traversing sys.modules and importing transformers
+# image-processing submodules that require torchvision (unavailable on Python 3.14).
+# Trade-off: no auto hot-reload — press R in the browser to manually rerun.
+fileWatcherType = "none"

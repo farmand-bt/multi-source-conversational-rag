@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,5 +23,5 @@ TOP_K = 5
 # Memory
 MAX_HISTORY_TURNS = 10
 
-# Vector store
-CHROMA_PERSIST_DIR = "./data/chroma"
+# Vector store — absolute path so it resolves correctly regardless of cwd
+CHROMA_PERSIST_DIR = str(Path(__file__).parent.parent / "data" / "chroma")
