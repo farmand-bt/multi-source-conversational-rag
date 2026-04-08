@@ -1,6 +1,9 @@
 from rag.chunking.chunker import Chunker
 from rag.embeddings.embedder import Embedder
+from rag.generation.generator import Generator
 from rag.ingestion.pdf_ingestor import PDFIngestor
+from rag.models import Answer
+from rag.retrieval.retriever import Retriever
 from rag.vectorstore.chroma_store import ChromaStore
 
 
@@ -11,8 +14,8 @@ class RAGPipeline:
     Write path (M2):
         ingest() -> Ingestor -> Chunker -> Embedder -> ChromaStore
 
-    Read path (M3+):
-        query() -> Embedder.embed_query -> ChromaStore.query -> Generator
+    Read path (M3):
+        ask() -> Retriever -> Generator -> Answer
     """
 
     def __init__(self) -> None:
@@ -20,6 +23,8 @@ class RAGPipeline:
         self._chunker = Chunker()
         self._store = ChromaStore()
         self._pdf_ingestor = PDFIngestor()
+        self._retriever = Retriever(self._embedder, self._store)
+        self._generator: Generator | None = None  # lazy: avoids startup failure without GWDG creds
 
     # ------------------------------------------------------------------
     # Write
@@ -58,6 +63,24 @@ class RAGPipeline:
     def list_sources(self) -> list[dict]:
         return self._store.list_sources()
 
-    def query(self, text: str) -> str:
-        # Milestone 3: embed query -> retrieve -> generate answer with citations
-        raise NotImplementedError("Query pipeline implemented in Milestone 3")
+    def ask(self, query: str, history: list[dict] | None = None) -> Answer:
+        """Answer a question using retrieved context.
+
+        Returns an Answer with no citations if the store is empty or query is blank.
+        """
+        results = self._retriever.retrieve(query)
+        if not results:
+            return Answer(text="I don't have enough information to answer that question.")
+
+        context_docs = [doc for doc, _ in results]
+        raw = self._get_generator().generate(query, context_docs, history)
+        return Answer.from_raw(raw)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _get_generator(self) -> Generator:
+        if self._generator is None:
+            self._generator = Generator()
+        return self._generator

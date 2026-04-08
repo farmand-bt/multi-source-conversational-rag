@@ -1,9 +1,22 @@
+from config.settings import TOP_K
+from rag.embeddings.embedder import Embedder
 from rag.ingestion.base import Document
-
-# Milestone 3: Implement retrieval using ChromaStore + Embedder.
-# Optional re-ranking in Milestone 3. Returns top-k Documents.
+from rag.vectorstore.chroma_store import ChromaStore
 
 
 class Retriever:
-    def retrieve(self, query: str) -> list[Document]:
-        raise NotImplementedError("Retriever implemented in Milestone 3")
+    """Embeds a query and retrieves the most relevant chunks from ChromaStore."""
+
+    def __init__(self, embedder: Embedder, store: ChromaStore) -> None:
+        self._embedder = embedder
+        self._store = store
+
+    def retrieve(self, query: str, top_k: int = TOP_K) -> list[tuple[Document, float]]:
+        """Return (Document, similarity_score) pairs for the given query.
+
+        Returns an empty list if the query is blank or the store is empty.
+        """
+        if not query.strip():
+            return []
+        embedding = self._embedder.embed_query(query)
+        return self._store.query(embedding, top_k)

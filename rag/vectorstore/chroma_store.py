@@ -9,8 +9,9 @@ class ChromaStore:
 
     _COLLECTION = "documents"
 
-    def __init__(self) -> None:
-        self._client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+    def __init__(self, persist_dir: str | None = None) -> None:
+        path = persist_dir or CHROMA_PERSIST_DIR
+        self._client = chromadb.PersistentClient(path=path)
         # cosine similarity is standard for sentence-transformer embeddings
         self._collection = self._client.get_or_create_collection(
             name=self._COLLECTION,
@@ -38,22 +39,24 @@ class ChromaStore:
     # Read
     # ------------------------------------------------------------------
 
-    def query(self, embedding: list[float], top_k: int) -> list[Document]:
+    def query(self, embedding: list[float], top_k: int) -> list[tuple[Document, float]]:
+        """Return top-k (Document, similarity_score) pairs, ordered by relevance."""
         count = self._collection.count()
         if count == 0:
             return []
         results = self._collection.query(
             query_embeddings=[embedding],
             n_results=min(top_k, count),
-            include=["documents", "metadatas"],
+            include=["documents", "metadatas", "distances"],
         )
         docs = results.get("documents") or []
         metas = results.get("metadatas") or []
+        dists = results.get("distances") or []
         if not docs or not docs[0]:
             return []
         return [
-            self._from_metadata(text, meta)
-            for text, meta in zip(docs[0], metas[0])
+            (self._from_metadata(text, meta), round(1.0 - dist, 4))
+            for text, meta, dist in zip(docs[0], metas[0], dists[0])
         ]
 
     def list_sources(self) -> list[dict]:

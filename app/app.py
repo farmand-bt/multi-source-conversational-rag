@@ -1,5 +1,6 @@
 import streamlit as st
 
+from components.chat import render_chat
 from components.sidebar import render_sidebar
 from components.source_viewer import render_source_viewer
 from page_config import LAYOUT, PAGE_ICON, PAGE_TITLE, SIDEBAR_STATE
@@ -19,15 +20,6 @@ def get_pipeline() -> RAGPipeline:
     return RAGPipeline()
 
 
-def render_chat() -> None:
-    st.header("Chat")
-    st.info("RAG pipeline coming in Milestone 3. Ingest sources from the sidebar first.")
-    st.chat_message("assistant").write(
-        "Hello! Upload a PDF in the sidebar to get started."
-    )
-    st.chat_input("Ask a question about your documents…", disabled=True)
-
-
 def main() -> None:
     pipeline = get_pipeline()
 
@@ -38,7 +30,7 @@ def main() -> None:
 
     chat_col, sources_col = st.columns([2, 1])
     with chat_col:
-        render_chat()
+        render_chat(pipeline)
     with sources_col:
         render_source_viewer(pipeline)
 
