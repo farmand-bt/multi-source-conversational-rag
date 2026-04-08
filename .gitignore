@@ -211,5 +211,6 @@ CLAUDE.md
 multi-source-rag-project-plan-prompt1.md
 
 # Project-specific
-data/
+data/*
+!data/.gitkeep
 .chroma/

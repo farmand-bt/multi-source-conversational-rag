@@ -1,5 +1,5 @@
 import streamlit as st
-from app.config import LAYOUT, PAGE_ICON, PAGE_TITLE, SIDEBAR_STATE
+from config import LAYOUT, PAGE_ICON, PAGE_TITLE, SIDEBAR_STATE
 
 st.set_page_config(
     page_title=PAGE_TITLE,
