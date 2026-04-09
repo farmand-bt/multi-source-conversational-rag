@@ -18,7 +18,7 @@ def render_chat(pipeline: RAGPipeline) -> None:
             if msg["role"] == "assistant" and msg.get("citations"):
                 with st.expander("Sources"):
                     for cite in msg["citations"]:
-                        st.markdown(f"- **{cite['source_name']}** — {cite['location']}")
+                        _render_citation(cite)
 
     has_sources = bool(pipeline.list_sources())
     placeholder = (
@@ -43,13 +43,17 @@ def render_chat(pipeline: RAGPipeline) -> None:
                 answer = pipeline.ask(prompt, history=history)
             st.write(answer.text)
             citations = [
-                {"source_name": c.source_name, "location": c.location}
+                {
+                    "source_type": c.source_type,
+                    "source_name": c.source_name,
+                    "location": c.location,
+                }
                 for c in answer.citations
             ]
             if citations:
                 with st.expander("Sources"):
                     for cite in citations:
-                        st.markdown(f"- **{cite['source_name']}** — {cite['location']}")
+                        _render_citation(cite)
 
         st.session_state.messages.append(
             {"role": "assistant", "content": answer.text, "citations": citations}
@@ -59,3 +63,13 @@ def render_chat(pipeline: RAGPipeline) -> None:
         max_msgs = _MAX_HISTORY_TURNS * 2
         if len(st.session_state.messages) > max_msgs:
             st.session_state.messages = st.session_state.messages[-max_msgs:]
+
+
+def _render_citation(cite: dict) -> None:
+    src_type = cite["source_type"]
+    name = cite["source_name"]
+    loc = cite["location"]
+    if loc:
+        st.markdown(f"- **[{src_type}]** {name} — {loc}")
+    else:
+        st.markdown(f"- **[{src_type}]** {name}")

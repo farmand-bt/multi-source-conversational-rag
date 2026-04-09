@@ -2,6 +2,8 @@ from rag.chunking.chunker import Chunker
 from rag.embeddings.embedder import Embedder
 from rag.generation.generator import Generator
 from rag.ingestion.pdf_ingestor import PDFIngestor
+from rag.ingestion.web_ingestor import WebIngestor
+from rag.ingestion.youtube_ingestor import YouTubeIngestor
 from rag.models import Answer
 from rag.retrieval.retriever import Retriever
 from rag.vectorstore.chroma_store import ChromaStore
@@ -11,7 +13,7 @@ class RAGPipeline:
     """
     Orchestrates the full RAG pipeline.
 
-    Write path (M2):
+    Write path (M2–M4):
         ingest() -> Ingestor -> Chunker -> Embedder -> ChromaStore
 
     Read path (M3):
@@ -23,6 +25,8 @@ class RAGPipeline:
         self._chunker = Chunker()
         self._store = ChromaStore()
         self._pdf_ingestor = PDFIngestor()
+        self._web_ingestor = WebIngestor()
+        self._yt_ingestor = YouTubeIngestor()
         self._retriever = Retriever(self._embedder, self._store)
         self._generator: Generator | None = None  # lazy: avoids startup failure without GWDG creds
 
@@ -43,10 +47,12 @@ class RAGPipeline:
         """
         if source_type == "pdf":
             docs = self._pdf_ingestor.ingest(source, source_name)
+        elif source_type == "web":
+            docs = self._web_ingestor.ingest(source, source_name)
+        elif source_type == "youtube":
+            docs = self._yt_ingestor.ingest(source, source_name)
         else:
-            raise NotImplementedError(
-                f"Source type '{source_type}' is implemented in Milestone 4"
-            )
+            raise ValueError(f"Unknown source type: '{source_type}'")
 
         chunks = self._chunker.chunk(docs)
         embeddings = self._embedder.embed_documents([c.text for c in chunks])

@@ -5,10 +5,12 @@ Conversational RAG assistant that lets you ingest documents from PDFs, web URLs,
 ## What works now
 
 - **PDF ingestion** — upload a PDF from the sidebar; pages are extracted, chunked, and embedded into a local ChromaDB vector store.
-- **Q&A with citations** — ask a question; the top-5 most relevant chunks are retrieved and sent to the LLM, which answers with `[Source: name, page N]` citations rendered in the UI.
-- **Source management** — view all ingested sources with chunk counts and delete them individually.
+- **Web page ingestion** — paste any URL; trafilatura extracts clean article text.
+- **YouTube ingestion** — paste a YouTube URL; the transcript is fetched and grouped into timestamp-bounded chunks.
+- **Q&A with citations** — ask a question; the top-5 most relevant chunks are retrieved and sent to the LLM, which answers with typed citations — `[PDF: name, page N]`, `[Web: title, URL]`, or `[YouTube: title, MM:SS]` — rendered in a collapsible expander.
+- **Source management** — view all ingested sources with type-specific metadata (page count, domain, video URL) and delete them individually.
 
-Web URL and YouTube ingestion, multi-turn memory, and query rewriting are coming in later milestones.
+Multi-turn memory and query rewriting are coming in Milestone 5.
 
 ## Setup
 

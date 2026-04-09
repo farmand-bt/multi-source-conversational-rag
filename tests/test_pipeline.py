@@ -21,7 +21,7 @@ class _MockGenerator:
     def generate(self, query: str, context_docs: list, history=None) -> str:
         name = context_docs[0].source_name if context_docs else "unknown"
         page = context_docs[0].page_number if context_docs else 1
-        return f"Mock answer. [Source: {name}, page {page}]"
+        return f"Mock answer. [PDF: {name}, page {page}]"
 
 
 def _build_pipeline(tmp_path, embedder):
@@ -70,6 +70,7 @@ def test_ask_returns_answer_with_citations(tmp_path, embedder):
     answer = pipeline.ask("What is Python?")
     assert isinstance(answer, Answer)
     assert len(answer.citations) == 1
+    assert answer.citations[0].source_type == "PDF"
     assert answer.citations[0].source_name == "seed.pdf"
     assert answer.citations[0].location == "page 1"
 
@@ -80,7 +81,7 @@ def test_ask_passes_history_to_generator(tmp_path, embedder):
     class _HistoryCapture:
         def generate(self, query, context_docs, history=None):
             received["history"] = history
-            return "Answer [Source: seed.pdf, page 1]"
+            return "Answer [PDF: seed.pdf, page 1]"
 
     pipeline = _build_pipeline(tmp_path, embedder)
     pipeline._generator = _HistoryCapture()

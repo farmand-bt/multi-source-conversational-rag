@@ -6,12 +6,12 @@ from rag.ingestion.base import Document
 
 _SYSTEM_PROMPT = (
     "You are a helpful assistant that answers questions strictly from the provided context.\n"
-    "After every factual claim, cite its source using exactly this format: "
-    "[Source: <source_name>, <location>]\n"
-    "  • For PDFs, location = 'page N'\n"
-    "  • For videos, location = 'timestamp HH:MM:SS'\n"
-    "  • For web pages, location = the URL\n"
-    "If the context does not contain enough information, say so clearly."
+    "After every factual claim, cite its source using exactly one of these formats:\n"
+    "  • PDF sources:     [PDF: filename.pdf, page N]\n"
+    "  • Web pages:       [Web: page title, URL]\n"
+    "  • YouTube videos:  [YouTube: video title, MM:SS]\n"
+    "Match the citation type to the source type shown in the context header.\n"
+    "If the context does not contain enough information to answer, say so clearly."
 )
 
 _USER_TEMPLATE = "Context:\n{context}\n\nQuestion: {query}"
@@ -52,16 +52,19 @@ class Generator:
     def _build_context(self, docs: list[Document]) -> str:
         parts = []
         for doc in docs:
-            location = self._format_location(doc)
-            parts.append(f"[Source: {doc.source_name}, {location}]\n{doc.text}")
+            header = self._format_header(doc)
+            parts.append(f"{header}\n{doc.text}")
         return "\n\n---\n\n".join(parts)
 
     @staticmethod
-    def _format_location(doc: Document) -> str:
-        if doc.page_number is not None:
-            return f"page {doc.page_number}"
-        if doc.timestamp is not None:
-            return doc.timestamp
-        if doc.url is not None:
-            return doc.url
-        return "unknown"
+    def _format_header(doc: Document) -> str:
+        """Format the source header shown to the LLM so it knows which citation tag to use."""
+        if doc.source_type == "pdf":
+            page = doc.page_number or "?"
+            return f"[PDF: {doc.source_name}, page {page}]"
+        if doc.source_type == "youtube":
+            ts = doc.timestamp or "0:00"
+            return f"[YouTube: {doc.source_name}, {ts}]"
+        # web
+        url = doc.url or doc.source_name
+        return f"[Web: {doc.source_name}, {url}]"
