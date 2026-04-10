@@ -72,6 +72,42 @@ def test_top_k_limits_results(retriever, embedder, store):
     assert len(results) <= 3
 
 
+def test_per_source_cap_enforces_diversity(embedder, tmp_path):
+    """Chunks from the same source should not crowd out other sources."""
+    from config.settings import MAX_CHUNKS_PER_SOURCE
+
+    store = ChromaStore(persist_dir=str(tmp_path / "chroma_diversity"))
+    ret = Retriever(embedder=embedder, store=store)
+
+    # Source A: 4 very similar chunks (would normally dominate)
+    source_a = [
+        Document(
+            text=f"Python programming language concept number {i}.",
+            source_type="pdf", source_name="a.pdf", source_id="src_a",
+            chunk_index=i, page_number=i + 1,
+        )
+        for i in range(4)
+    ]
+    # Source B: 1 chunk on a different but related topic
+    source_b = [
+        Document(
+            text="Python is widely used in data science and machine learning.",
+            source_type="web", source_name="b.com", source_id="src_b",
+            chunk_index=0,
+        )
+    ]
+    all_docs = source_a + source_b
+    store.add(all_docs, embedder.embed_documents([d.text for d in all_docs]))
+
+    results = ret.retrieve("Python programming", top_k=5)
+    source_ids = [doc.source_id for doc, _ in results]
+
+    # Source A must contribute at most MAX_CHUNKS_PER_SOURCE chunks
+    assert source_ids.count("src_a") <= MAX_CHUNKS_PER_SOURCE
+    # Source B must appear despite lower raw scores
+    assert "src_b" in source_ids
+
+
 def test_scores_are_ordered_descending(retriever, embedder, store):
     docs = [
         _doc("Deep learning uses neural networks.", page=1, chunk_index=0),

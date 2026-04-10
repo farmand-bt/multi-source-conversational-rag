@@ -19,6 +19,7 @@ CHUNK_OVERLAP = 50
 
 # Retrieval
 TOP_K = 5
+MAX_CHUNKS_PER_SOURCE = 3  # max chunks retrieved from any single source (ensures diversity)
 
 # Memory
 MAX_HISTORY_TURNS = 10

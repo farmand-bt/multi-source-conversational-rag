@@ -194,7 +194,7 @@ class TestYouTubeIngestor:
         mock_api.fetch.side_effect = TranscriptsDisabled("abc")
         monkeypatch.setattr("rag.ingestion.youtube_ingestor.YouTubeTranscriptApi", lambda: mock_api)
         monkeypatch.setattr("rag.ingestion.youtube_ingestor._fetch_title", lambda v: None)
-        with pytest.raises(ValueError, match="No transcript"):
+        with pytest.raises(ValueError, match="disabled"):
             YouTubeIngestor().ingest("abc")
 
     def test_source_id_stable_for_same_video(self, monkeypatch):
@@ -202,6 +202,31 @@ class TestYouTubeIngestor:
         id1 = YouTubeIngestor().ingest("dQw4w9WgXcQ")[0].source_id
         id2 = YouTubeIngestor().ingest("https://youtube.com/watch?v=dQw4w9WgXcQ")[0].source_id
         assert id1 == id2
+
+    def test_falls_back_to_any_language_when_english_not_found(self, monkeypatch):
+        """When no English transcript exists, fall back to any available language."""
+        from youtube_transcript_api._errors import NoTranscriptFound
+
+        french_snippet = _make_snippet("Bonjour tout le monde", 0.0)
+
+        mock_transcript = MagicMock()
+        mock_transcript.fetch.return_value = [french_snippet]
+
+        mock_transcript_list = MagicMock()
+        mock_transcript_list.__iter__ = MagicMock(return_value=iter([mock_transcript]))
+
+        mock_api = MagicMock()
+        # English fetch fails; list() returns a French transcript
+        mock_api.fetch.side_effect = NoTranscriptFound("abc", ["en", "en-US", "en-GB"], [])
+        mock_api.list.return_value = mock_transcript_list
+
+        monkeypatch.setattr("rag.ingestion.youtube_ingestor.YouTubeTranscriptApi", lambda: mock_api)
+        monkeypatch.setattr("rag.ingestion.youtube_ingestor._fetch_title", lambda v: "French Video")
+
+        docs = YouTubeIngestor().ingest("abc")
+        assert len(docs) >= 1
+        assert docs[0].source_type == "youtube"
+        assert "Bonjour" in docs[0].text
 
 
 # ===========================================================================

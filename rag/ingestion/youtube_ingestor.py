@@ -36,17 +36,32 @@ class YouTubeIngestor(Ingestor):
         url = f"https://www.youtube.com/watch?v={video_id}"
 
         try:
-            transcript = self._api.fetch(video_id)
-            segments = [{"text": s.text.strip(), "start": s.start} for s in transcript]
-        except (TranscriptsDisabled, NoTranscriptFound) as e:
+            # Try English first (covers manual + auto-generated English captions)
+            transcript = self._api.fetch(video_id, languages=["en", "en-US", "en-GB"])
+        except NoTranscriptFound:
+            # Fall back to any available transcript (other languages, auto-generated)
+            try:
+                transcript_list = self._api.list(video_id)
+                first = next(iter(transcript_list), None)
+                if first is None:
+                    raise ValueError(
+                        f"No transcripts are available for video '{video_id}'."
+                    )
+                transcript = first.fetch()
+            except (VideoUnavailable, CouldNotRetrieveTranscript) as e:
+                raise ValueError(
+                    f"Could not retrieve transcript for '{video_id}': {e}"
+                ) from e
+        except TranscriptsDisabled as e:
             raise ValueError(
-                f"No transcript is available for video '{video_id}'. "
-                "The video may have disabled captions."
+                f"Transcripts have been disabled by the owner of video '{video_id}'."
             ) from e
         except (VideoUnavailable, CouldNotRetrieveTranscript) as e:
             raise ValueError(
                 f"Could not retrieve transcript for '{video_id}': {e}"
             ) from e
+
+        segments = [{"text": s.text.strip(), "start": s.start} for s in transcript]
 
         segments = [s for s in segments if s["text"]]
         if not segments:

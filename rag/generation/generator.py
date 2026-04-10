@@ -9,7 +9,7 @@ _SYSTEM_PROMPT = (
     "After every factual claim, cite its source using exactly one of these formats:\n"
     "  • PDF sources:     [PDF: filename.pdf, page N]\n"
     "  • Web pages:       [Web: page title, URL]\n"
-    "  • YouTube videos:  [YouTube: video title, MM:SS]\n"
+    "  • YouTube videos:  [YouTube: video title, URL] — copy the URL from the context header exactly\n"
     "Match the citation type to the source type shown in the context header.\n"
     "If the context does not contain enough information to answer, say so clearly."
 )
@@ -64,7 +64,19 @@ class Generator:
             return f"[PDF: {doc.source_name}, page {page}]"
         if doc.source_type == "youtube":
             ts = doc.timestamp or "0:00"
+            if doc.url:
+                # Embed the timestamped URL so the LLM can copy it verbatim into citations.
+                ts_url = f"{doc.url}&t={_ts_to_seconds(ts)}s"
+                return f"[YouTube: {doc.source_name}, {ts_url}]"
             return f"[YouTube: {doc.source_name}, {ts}]"
         # web
         url = doc.url or doc.source_name
         return f"[Web: {doc.source_name}, {url}]"
+
+
+def _ts_to_seconds(ts: str) -> int:
+    """Convert MM:SS or H:MM:SS timestamp string to total seconds."""
+    parts = [int(p) for p in ts.split(":")]
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    return parts[0] * 60 + parts[1]
