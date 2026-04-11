@@ -97,3 +97,17 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Ingestion failed: {exc}")
+
+        st.divider()
+
+        # ── Retrieval settings ────────────────────────────────────────
+        st.subheader("⚙️ Retrieval")
+        st.toggle(
+            "Re-rank results",
+            key="use_reranking",
+            help=(
+                "Uses a cross-encoder to re-score retrieved chunks before generating "
+                "an answer. More accurate for follow-up and ambiguous questions, "
+                "but adds ~1–3 s latency. Runs locally — no extra API calls."
+            ),
+        )

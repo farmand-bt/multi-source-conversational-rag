@@ -108,6 +108,36 @@ def test_per_source_cap_enforces_diversity(embedder, tmp_path):
     assert "src_b" in source_ids
 
 
+def test_rerank_returns_same_docs_as_no_rerank(retriever, embedder, store, monkeypatch):
+    """With rerank=True the same documents are returned, just potentially in a different order."""
+    from unittest.mock import MagicMock
+    import numpy as np
+
+    docs = [
+        _doc("Deep learning uses neural networks.", page=1, chunk_index=0),
+        _doc("Python is a programming language.", page=2, chunk_index=1),
+    ]
+    embs = embedder.embed_documents([d.text for d in docs])
+    store.add(docs, embs)
+
+    # Mock CrossEncoder so the test runs without downloading the model
+    mock_ce = MagicMock()
+    mock_ce.predict.return_value = np.array([0.9, 0.1])
+    mock_ce_cls = MagicMock(return_value=mock_ce)
+    monkeypatch.setattr("rag.retrieval.retriever.CrossEncoder", mock_ce_cls, raising=False)
+    # Inject via the lazy import path
+    import sentence_transformers
+    monkeypatch.setattr(sentence_transformers, "CrossEncoder", mock_ce_cls)
+
+    results_plain = retriever.retrieve("deep learning", top_k=2, rerank=False)
+    retriever._cross_encoder = None  # reset so mock kicks in
+    results_reranked = retriever.retrieve("deep learning", top_k=2, rerank=True)
+
+    plain_texts = {doc.text for doc, _ in results_plain}
+    reranked_texts = {doc.text for doc, _ in results_reranked}
+    assert plain_texts == reranked_texts
+
+
 def test_scores_are_ordered_descending(retriever, embedder, store):
     docs = [
         _doc("Deep learning uses neural networks.", page=1, chunk_index=0),

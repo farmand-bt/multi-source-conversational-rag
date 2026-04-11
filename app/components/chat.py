@@ -7,9 +7,24 @@ from rag.pipeline import RAGPipeline
 
 _MAX_HISTORY_TURNS = 10  # user+assistant pairs kept in session state
 _CITE_COLOUR = "#e07b39"  # warm orange for inline citation numbers
+_ORANGE = "#e07b39"
+_GREEN = "#198754"
+_GREY = "#adb5bd"
+
+# Inject once per page load — justifies assistant answer paragraphs
+_JUSTIFY_CSS = """
+<style>
+[data-testid="stChatMessage"] p {
+    text-align: justify;
+    hyphens: auto;
+}
+</style>
+"""
 
 
 def render_chat(pipeline: RAGPipeline) -> None:
+    st.markdown(_JUSTIFY_CSS, unsafe_allow_html=True)
+
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -62,8 +77,8 @@ def render_chat(pipeline: RAGPipeline) -> None:
         with st.chat_message("user"):
             st.write(prompt)
 
-        with st.spinner("Thinking…"):
-            answer = pipeline.ask(prompt, history=history)
+        rerank = st.session_state.get("use_reranking", False)
+        answer = _run_pipeline(pipeline, prompt, history, rerank)
 
         clean_text, numbered = _number_citations(answer)
         st.session_state.messages.append(
@@ -80,6 +95,126 @@ def render_chat(pipeline: RAGPipeline) -> None:
             st.session_state.messages = st.session_state.messages[-max_msgs:]
 
         st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# Pipeline runner with live sequential step display
+# ---------------------------------------------------------------------------
+
+def _run_pipeline(
+    pipeline: RAGPipeline,
+    prompt: str,
+    history: list[dict],
+    rerank: bool,
+) -> Answer:
+    """Execute rewrite → retrieve → generate with a live step-by-step progress card.
+
+    Each step updates an st.empty() placeholder immediately, guaranteeing
+    that steps appear sequentially in the UI as they complete.
+    """
+    has_history = bool(history)
+    retrieve_label = "Retrieve & Re-rank" if rerank else "Retrieve"
+
+    # Build the ordered step list (Rewrite only shown when there is history)
+    steps: list[dict] = []
+    if has_history:
+        steps.append({"emoji": "✏️", "label": "Rewrite", "state": "pending", "detail": ""})
+    steps.append({"emoji": "🔍", "label": retrieve_label, "state": "pending", "detail": ""})
+    steps.append({"emoji": "🤖", "label": "Generate", "state": "pending", "detail": ""})
+
+    box = st.empty()
+
+    def _render() -> None:
+        box.markdown(_pipeline_card(steps), unsafe_allow_html=True)
+
+    _render()
+
+    # ── Step: Rewrite ─────────────────────────────────────────────────
+    rewritten = prompt
+    if has_history:
+        steps[0]["state"] = "active"
+        _render()
+        rewritten = pipeline.rewrite_query(prompt, history)
+        steps[0]["state"] = "done"
+        if rewritten != prompt:
+            short = rewritten if len(rewritten) <= 60 else rewritten[:57] + "…"
+            steps[0]["detail"] = f'"{short}"'
+        else:
+            steps[0]["detail"] = "No change"
+        _render()
+
+    # ── Step: Retrieve ────────────────────────────────────────────────
+    retrieve_idx = 1 if has_history else 0
+    steps[retrieve_idx]["state"] = "active"
+    _render()
+    docs = pipeline.retrieve(rewritten, rerank=rerank)
+    steps[retrieve_idx]["state"] = "done"
+    n = len(docs)
+    steps[retrieve_idx]["detail"] = f"{n} chunk{'s' if n != 1 else ''} found"
+    _render()
+
+    # ── Step: Generate ────────────────────────────────────────────────
+    generate_idx = retrieve_idx + 1
+    if not docs:
+        box.empty()
+        return Answer(text="I don't have enough information to answer that question.")
+
+    steps[generate_idx]["state"] = "active"
+    _render()
+    rewritten_for_display = rewritten if rewritten != prompt else ""
+    answer = pipeline.generate(prompt, docs, history, rewritten_query=rewritten_for_display)
+    steps[generate_idx]["state"] = "done"
+    _render()
+
+    box.empty()  # remove the progress card once the answer is ready
+    return answer
+
+
+def _pipeline_card(steps: list[dict]) -> str:
+    """Render a horizontal pipeline progress card as HTML."""
+    cells = []
+    for i, step in enumerate(steps):
+        state = step["state"]
+
+        if state == "pending":
+            icon = "○"
+            color = _GREY
+            sub = "Waiting…"
+        elif state == "active":
+            icon = "●"
+            color = _ORANGE
+            sub = "Running…"
+        else:  # done
+            icon = "✓"
+            color = _GREEN
+            sub = step.get("detail") or "Done"
+
+        cell = (
+            f'<div style="text-align:center;flex:1;min-width:80px;">'
+            f'  <div style="font-size:20px;line-height:1.3">{step["emoji"]}</div>'
+            f'  <div style="font-size:13px;font-weight:600;color:{color};margin-top:2px">'
+            f'    {step["label"]}'
+            f'  </div>'
+            f'  <div style="font-size:11px;color:{color};margin-top:2px">'
+            f'    {icon} {sub}'
+            f'  </div>'
+            f'</div>'
+        )
+        cells.append(cell)
+
+        if i < len(steps) - 1:
+            arrow_col = _GREEN if state == "done" else _GREY
+            cells.append(
+                f'<div style="padding:18px 4px 0;color:{arrow_col};font-size:16px">→</div>'
+            )
+
+    inner = "\n".join(cells)
+    return (
+        '<div style="display:flex;align-items:flex-start;gap:4px;padding:12px 16px;'
+        'background:#f8f9fa;border-radius:8px;border:1px solid #dee2e6;margin:4px 0;">'
+        f"{inner}"
+        "</div>"
+    )
 
 
 # ---------------------------------------------------------------------------

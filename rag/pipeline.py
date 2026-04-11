@@ -71,32 +71,52 @@ class RAGPipeline:
     def list_sources(self) -> list[dict]:
         return self._store.list_sources()
 
-    def ask(self, query: str, history: list[dict] | None = None) -> Answer:
-        """Answer a question using retrieved context.
+    # ------------------------------------------------------------------
+    # Granular read-path steps (used by the UI for live progress display)
+    # ------------------------------------------------------------------
 
-        If *history* is provided and non-empty, the query is first rewritten
-        into a standalone question to improve retrieval accuracy. The original
-        query (with full history) is still sent to the generator so the LLM
-        has complete conversational context when forming its answer.
+    def rewrite_query(self, query: str, history: list[dict] | None = None) -> str:
+        """Rewrite *query* as a standalone question when history is present.
 
-        Returns an Answer with no citations if the store is empty or query is blank.
+        Returns the original query unchanged when there is no history to resolve.
         """
-        # Rewrite follow-up questions so retrieval finds the right chunks
-        if history:
-            rewritten = self._memory.rewrite_query(query, history)
-        else:
-            rewritten = query
+        return self._memory.rewrite_query(query, history) if history else query
 
-        results = self._retriever.retrieve(rewritten)
-        if not results:
+    def retrieve(self, query: str, rerank: bool = False) -> list:
+        """Embed *query* and return the top-k most relevant Document objects."""
+        results = self._retriever.retrieve(query, rerank=rerank)
+        return [doc for doc, _ in results]
+
+    def generate(
+        self,
+        query: str,
+        docs: list,
+        history: list[dict] | None = None,
+        rewritten_query: str = "",
+    ) -> Answer:
+        """Call the LLM with *docs* as context and return a parsed Answer.
+
+        Returns a no-citation fallback Answer when *docs* is empty.
+        """
+        if not docs:
             return Answer(text="I don't have enough information to answer that question.")
+        raw = self._get_generator().generate(query, docs, history)
+        return Answer.from_raw(raw, rewritten_query=rewritten_query)
 
-        context_docs = [doc for doc, _ in results]
-        # Generator receives the *original* query + full history so it can
-        # answer in the conversational context (not the rewritten standalone form).
-        raw = self._get_generator().generate(query, context_docs, history)
+    # ------------------------------------------------------------------
+    # High-level convenience (used by tests and non-UI callers)
+    # ------------------------------------------------------------------
+
+    def ask(self, query: str, history: list[dict] | None = None, rerank: bool = False) -> Answer:
+        """Rewrite → retrieve → generate in a single call.
+
+        The original query + full history is sent to the generator so the LLM
+        answers in conversational context even when the retrieval query was rewritten.
+        """
+        rewritten = self.rewrite_query(query, history)
+        docs = self.retrieve(rewritten, rerank=rerank)
         rewritten_for_display = rewritten if rewritten != query else ""
-        return Answer.from_raw(raw, rewritten_query=rewritten_for_display)
+        return self.generate(query, docs, history, rewritten_query=rewritten_for_display)
 
     def clear_history(self) -> None:
         """Clear the conversation memory (called when the user resets the chat)."""

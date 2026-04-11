@@ -2,15 +2,15 @@
 
 Conversational RAG assistant that lets you ingest documents from PDFs, web URLs, and YouTube transcripts, then ask natural-language questions with multi-turn memory and source citations.
 
-## What works now
+## Features
 
 - **PDF ingestion** — upload a PDF from the sidebar; pages are extracted, chunked, and embedded into a local ChromaDB vector store.
 - **Web page ingestion** — paste any URL; trafilatura extracts clean article text.
 - **YouTube ingestion** — paste a YouTube URL; the transcript is fetched and grouped into timestamp-bounded chunks.
-- **Q&A with citations** — ask a question; the top-5 most relevant chunks are retrieved and sent to the LLM, which answers with typed citations — `[PDF: name, page N]`, `[Web: title, URL]`, or `[YouTube: title, MM:SS]` — rendered in a collapsible expander.
+- **Q&A with citations** — ask a question; the top-5 most relevant chunks are retrieved and sent to the LLM, which answers with typed citations — `[PDF: name, page N]`, `[Web: title, URL]`, or `[YouTube: title, timestamp]` — rendered as numbered references in a collapsible Sources expander.
+- **Conversational memory** — follow-up questions automatically resolve pronouns and references ("How does *that* compare to RNNs?"). A `🔍 Query rewritten as` expander shows when the query was reformulated for retrieval.
+- **Re-ranking (optional)** — toggle in the sidebar enables a local cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to re-score retrieved chunks before generation. More accurate for ambiguous questions; adds ~1–3 s latency; no API calls.
 - **Source management** — view all ingested sources with type-specific metadata (page count, domain, video URL) and delete them individually.
-
-Multi-turn memory and query rewriting are coming in Milestone 5.
 
 ## Setup
 
@@ -41,4 +41,4 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 
 ## Tech stack
 
-Python 3.10+ · LangChain · ChromaDB · sentence-transformers (`all-MiniLM-L6-v2`) · GWDG API · PyMuPDF · trafilatura · youtube-transcript-api · Streamlit · Ruff
+Python 3.10+ · LangChain · ChromaDB · sentence-transformers (`all-MiniLM-L6-v2` + `cross-encoder/ms-marco-MiniLM-L-6-v2`) · GWDG API · PyMuPDF · trafilatura · youtube-transcript-api · Streamlit · Ruff
