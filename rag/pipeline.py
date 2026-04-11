@@ -64,6 +64,10 @@ class RAGPipeline:
     def delete_source(self, source_id: str) -> None:
         self._store.delete(source_id)
 
+    def delete_all_sources(self) -> None:
+        """Remove every ingested chunk from the vector store."""
+        self._store.delete_all()
+
     # ------------------------------------------------------------------
     # Read
     # ------------------------------------------------------------------

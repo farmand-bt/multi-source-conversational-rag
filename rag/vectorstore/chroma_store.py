@@ -35,6 +35,14 @@ class ChromaStore:
     def delete(self, source_id: str) -> None:
         self._collection.delete(where={"source_id": source_id})
 
+    def delete_all(self) -> None:
+        """Drop and recreate the collection, removing every stored chunk."""
+        self._client.delete_collection(self._COLLECTION)
+        self._collection = self._client.get_or_create_collection(
+            name=self._COLLECTION,
+            metadata={"hnsw:space": "cosine"},
+        )
+
     # ------------------------------------------------------------------
     # Read
     # ------------------------------------------------------------------

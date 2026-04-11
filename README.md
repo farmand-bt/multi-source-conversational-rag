@@ -6,7 +6,7 @@ A conversational AI assistant that lets you ingest documents from **PDFs, web pa
 
 ## Demo
 
-> *Add a demo GIF or screenshot here after recording a screen capture of the app in action.*
+![Demo](assets/demo.gif)
 
 ---
 
@@ -80,12 +80,13 @@ make run                      # launches the Streamlit app at http://localhost:8
 
 Copy `.env.example` to `.env` and fill in:
 
-| Variable | Description |
-|---|---|
-| `GWDG_API_KEY` | API key for the GWDG (or any OpenAI-compatible) LLM endpoint |
-| `GWDG_API_BASE` | Base URL, e.g. `https://chat-ai.academiccloud.de/v1` |
-| `GWDG_MODEL_NAME` | Model name, e.g. `meta-llama-3.1-70b-instruct` |
-| `HF_HUB_DISABLE_SYMLINKS_WARNING` | Set to `1` on Windows to suppress a cosmetic HuggingFace warning |
+| Variable | Required | Description |
+|---|---|---|
+| `GWDG_API_KEY` | ✅ | API key for the GWDG (or any OpenAI-compatible) LLM endpoint |
+| `GWDG_API_BASE` | ✅ | Base URL, e.g. `https://chat-ai.academiccloud.de/v1` |
+| `GWDG_MODEL_NAME` | ✅ | Model name, e.g. `meta-llama-3.1-70b-instruct` |
+| `HF_TOKEN` | ☑️ optional | HuggingFace token — only needed to access gated models. The embedding and re-ranking models used here are public, so this can be left empty. |
+| `HF_HUB_DISABLE_SYMLINKS_WARNING` | ☑️ optional | Set to `1` on Windows to suppress a cosmetic HuggingFace cache warning (no functional impact). |
 
 ---
 

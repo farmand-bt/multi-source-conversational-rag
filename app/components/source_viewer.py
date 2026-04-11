@@ -8,13 +8,35 @@ _ICONS = {"pdf": "📄", "web": "🌐", "youtube": "▶️"}
 
 
 def render_source_viewer(pipeline: RAGPipeline) -> None:
-    st.header("Ingested Sources")
     sources = pipeline.list_sources()
 
+    # ── Header row with "Delete all" (only when sources exist) ────────
+    col_title, col_btn = st.columns([3, 2])
+    with col_title:
+        st.header("Ingested Sources")
+    with col_btn:
+        if sources:
+            st.write("")  # vertical alignment nudge
+            if st.session_state.get("confirm_delete_all"):
+                if st.button(
+                    "⚠️ Confirm delete all",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    pipeline.delete_all_sources()
+                    st.session_state.confirm_delete_all = False
+                    st.rerun()
+            else:
+                if st.button("🗑️ Delete all", use_container_width=True):
+                    st.session_state.confirm_delete_all = True
+                    st.rerun()
+
     if not sources:
+        st.session_state.confirm_delete_all = False
         st.caption("No sources yet. Upload a PDF or add a URL from the sidebar.")
         return
 
+    # ── Per-source expanders ───────────────────────────────────────────
     for source in sources:
         icon = _ICONS.get(source["source_type"], "📁")
         label = f"{icon} {source['source_name']}  ·  {source['chunk_count']} chunks"
@@ -23,7 +45,6 @@ def render_source_viewer(pipeline: RAGPipeline) -> None:
             st.write(f"**Type:** {source['source_type'].upper()}")
             st.write(f"**Chunks:** {source['chunk_count']}")
 
-            # Source-type-specific metadata
             stype = source["source_type"]
             if stype == "pdf" and source.get("page_count"):
                 st.write(f"**Pages:** {source['page_count']}")
