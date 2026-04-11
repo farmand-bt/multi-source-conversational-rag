@@ -1,9 +1,9 @@
 import streamlit as st
-
 from components.chat import render_chat
 from components.sidebar import render_sidebar
 from components.source_viewer import render_source_viewer
 from page_config import LAYOUT, PAGE_ICON, PAGE_TITLE, SIDEBAR_STATE
+
 from rag.pipeline import RAGPipeline
 
 st.set_page_config(

@@ -5,10 +5,28 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _get(key: str, default: str = "") -> str:
+    """Read a setting from environment variables, then Streamlit secrets as fallback.
+
+    Local dev:          values come from .env via python-dotenv.
+    Streamlit Cloud:    values come from st.secrets (set in the dashboard).
+    """
+    value = os.getenv(key, "")
+    if not value:
+        try:
+            import streamlit as st  # noqa: PLC0415
+
+            value = st.secrets.get(key, default)
+        except Exception:
+            value = default
+    return value
+
+
 # LLM
-GWDG_API_KEY = os.getenv("GWDG_API_KEY", "")
-GWDG_API_BASE = os.getenv("GWDG_API_BASE", "")
-GWDG_MODEL_NAME = os.getenv("GWDG_MODEL_NAME", "")
+GWDG_API_KEY = _get("GWDG_API_KEY")
+GWDG_API_BASE = _get("GWDG_API_BASE")
+GWDG_MODEL_NAME = _get("GWDG_MODEL_NAME")
 
 # Embeddings
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"

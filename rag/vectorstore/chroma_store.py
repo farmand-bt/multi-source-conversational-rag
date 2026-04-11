@@ -62,7 +62,7 @@ class ChromaStore:
     def list_sources(self) -> list[dict]:
         results = self._collection.get(include=["metadatas"])
         sources: dict[str, dict] = {}
-        for meta in (results.get("metadatas") or []):
+        for meta in results.get("metadatas") or []:
             sid = meta["source_id"]
             if sid not in sources:
                 sources[sid] = {
@@ -71,8 +71,8 @@ class ChromaStore:
                     "source_type": meta.get("source_type", "unknown"),
                     "ingested_at": meta.get("ingested_at", ""),
                     "chunk_count": 0,
-                    "url": meta.get("url"),      # web / youtube
-                    "page_count": 0,             # pdf: max page_number seen
+                    "url": meta.get("url"),  # web / youtube
+                    "page_count": 0,  # pdf: max page_number seen
                 }
             sources[sid]["chunk_count"] += 1
             page = meta.get("page_number") or 0

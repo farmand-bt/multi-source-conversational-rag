@@ -20,9 +20,7 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
 
         # ── PDF ───────────────────────────────────────────────────────
         st.subheader("📄 Upload PDF")
-        uploaded = st.file_uploader(
-            "Choose a PDF file", type="pdf", label_visibility="collapsed"
-        )
+        uploaded = st.file_uploader("Choose a PDF file", type="pdf", label_visibility="collapsed")
         if uploaded is not None:
             st.caption(f"Selected: **{uploaded.name}**")
             if st.button("Ingest PDF", type="primary", use_container_width=True):

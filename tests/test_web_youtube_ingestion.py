@@ -4,7 +4,7 @@ External HTTP calls (trafilatura.fetch_url, YouTubeTranscriptApi.fetch) are
 mocked so tests run offline without touching real services.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -15,7 +15,6 @@ from rag.ingestion.youtube_ingestor import (
     _format_ts,
     _group_segments,
 )
-
 
 # ===========================================================================
 # WebIngestor
@@ -115,6 +114,7 @@ class TestDisplayUrl:
 # ===========================================================================
 # YouTubeIngestor
 # ===========================================================================
+
 
 def _make_snippet(text: str, start: float, duration: float = 3.0) -> MagicMock:
     s = MagicMock()
@@ -232,6 +232,7 @@ class TestYouTubeIngestor:
 # ===========================================================================
 # Unit helpers
 # ===========================================================================
+
 
 class TestExtractVideoId:
     def test_youtube_watch_url(self):

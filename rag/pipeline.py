@@ -22,7 +22,7 @@ class RAGPipeline:
     """
 
     def __init__(self) -> None:
-        self._embedder = Embedder()          # loads sentence-transformer model once
+        self._embedder = Embedder()  # loads sentence-transformer model once
         self._chunker = Chunker()
         self._store = ChromaStore()
         self._pdf_ingestor = PDFIngestor()

@@ -5,14 +5,12 @@ The LLM call inside rewrite_query is mocked so tests run offline.
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from rag.memory.conversation import ConversationMemory
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_memory_with_mock_llm(rewrite_response: str = "standalone question") -> ConversationMemory:
     mem = ConversationMemory()
@@ -25,6 +23,7 @@ def _make_memory_with_mock_llm(rewrite_response: str = "standalone question") ->
 # ---------------------------------------------------------------------------
 # add_turn / get_history / clear
 # ---------------------------------------------------------------------------
+
 
 class TestConversationMemoryState:
     def test_empty_history_on_init(self):
@@ -68,6 +67,7 @@ class TestConversationMemoryState:
 # rewrite_query
 # ---------------------------------------------------------------------------
 
+
 class TestRewriteQuery:
     def test_no_history_returns_original_query(self):
         mem = ConversationMemory()
@@ -92,7 +92,10 @@ class TestRewriteQuery:
     def test_uses_passed_history_over_internal_turns(self):
         mem = _make_memory_with_mock_llm("rewritten")
         mem.add_turn("internal Q", "internal A")
-        external_history = [{"role": "user", "content": "external"}, {"role": "assistant", "content": "answer"}]
+        external_history = [
+            {"role": "user", "content": "external"},
+            {"role": "assistant", "content": "answer"},
+        ]
         mem.rewrite_query("follow-up", history=external_history)
         # Verify the prompt sent to the LLM contains the external history text
         call_args = mem._llm.invoke.call_args[0][0]  # list of messages

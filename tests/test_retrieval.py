@@ -1,5 +1,3 @@
-import dataclasses
-
 import pytest
 
 from rag.ingestion.base import Document
@@ -83,8 +81,11 @@ def test_per_source_cap_enforces_diversity(embedder, tmp_path):
     source_a = [
         Document(
             text=f"Python programming language concept number {i}.",
-            source_type="pdf", source_name="a.pdf", source_id="src_a",
-            chunk_index=i, page_number=i + 1,
+            source_type="pdf",
+            source_name="a.pdf",
+            source_id="src_a",
+            chunk_index=i,
+            page_number=i + 1,
         )
         for i in range(4)
     ]
@@ -92,7 +93,9 @@ def test_per_source_cap_enforces_diversity(embedder, tmp_path):
     source_b = [
         Document(
             text="Python is widely used in data science and machine learning.",
-            source_type="web", source_name="b.com", source_id="src_b",
+            source_type="web",
+            source_name="b.com",
+            source_id="src_b",
             chunk_index=0,
         )
     ]
@@ -111,6 +114,7 @@ def test_per_source_cap_enforces_diversity(embedder, tmp_path):
 def test_rerank_returns_same_docs_as_no_rerank(retriever, embedder, store, monkeypatch):
     """With rerank=True the same documents are returned, just potentially in a different order."""
     from unittest.mock import MagicMock
+
     import numpy as np
 
     docs = [
@@ -127,6 +131,7 @@ def test_rerank_returns_same_docs_as_no_rerank(retriever, embedder, store, monke
     monkeypatch.setattr("rag.retrieval.retriever.CrossEncoder", mock_ce_cls, raising=False)
     # Inject via the lazy import path
     import sentence_transformers
+
     monkeypatch.setattr(sentence_transformers, "CrossEncoder", mock_ce_cls)
 
     results_plain = retriever.retrieve("deep learning", top_k=2, rerank=False)

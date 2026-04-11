@@ -2,7 +2,7 @@ import re
 
 import streamlit as st
 
-from rag.models import Answer, _CITATION_RE
+from rag.models import _CITATION_RE, Answer
 from rag.pipeline import RAGPipeline
 
 _MAX_HISTORY_TURNS = 10  # user+assistant pairs kept in session state
@@ -66,10 +66,9 @@ def render_chat(pipeline: RAGPipeline) -> None:
     # above the chat input widget.
     if prompt := st.chat_input(placeholder, disabled=not has_sources):
         # Build history from current messages BEFORE appending the new one
-        history = [
-            {"role": m["role"], "content": m["content"]}
-            for m in st.session_state.messages
-        ][-_MAX_HISTORY_TURNS * 2 :]
+        history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages][
+            -_MAX_HISTORY_TURNS * 2 :
+        ]
 
         st.session_state.messages.append({"role": "user", "content": prompt})
 
@@ -100,6 +99,7 @@ def render_chat(pipeline: RAGPipeline) -> None:
 # ---------------------------------------------------------------------------
 # Pipeline runner with live sequential step display
 # ---------------------------------------------------------------------------
+
 
 def _run_pipeline(
     pipeline: RAGPipeline,
@@ -162,12 +162,31 @@ def _run_pipeline(
     steps[generate_idx]["state"] = "active"
     _render()
     rewritten_for_display = rewritten if rewritten != prompt else ""
-    answer = pipeline.generate(prompt, docs, history, rewritten_query=rewritten_for_display)
+    try:
+        answer = pipeline.generate(prompt, docs, history, rewritten_query=rewritten_for_display)
+    except Exception as exc:
+        steps[generate_idx]["detail"] = "Error"
+        _render()
+        box.empty()
+        return Answer(text=f"⚠️ {_llm_error_message(exc)}")
+
     steps[generate_idx]["state"] = "done"
     _render()
 
     box.empty()  # remove the progress card once the answer is ready
     return answer
+
+
+def _llm_error_message(exc: Exception) -> str:
+    """Convert an LLM API exception into a user-friendly message."""
+    msg = str(exc).lower()
+    if "rate limit" in msg or "429" in msg:
+        return "The LLM API rate limit was reached. Please wait a moment and try again."
+    if "401" in msg or "unauthorized" in msg or "authentication" in msg:
+        return "LLM API authentication failed. Check that your API key is correct."
+    if "connect" in msg or "network" in msg or "timeout" in msg:
+        return "Could not reach the LLM API. Check your internet connection and try again."
+    return f"The LLM returned an unexpected error: {exc}"
 
 
 def _pipeline_card(steps: list[dict]) -> str:
@@ -193,12 +212,12 @@ def _pipeline_card(steps: list[dict]) -> str:
             f'<div style="text-align:center;flex:1;min-width:80px;">'
             f'  <div style="font-size:20px;line-height:1.3">{step["emoji"]}</div>'
             f'  <div style="font-size:13px;font-weight:600;color:{color};margin-top:2px">'
-            f'    {step["label"]}'
-            f'  </div>'
+            f"    {step['label']}"
+            f"  </div>"
             f'  <div style="font-size:11px;color:{color};margin-top:2px">'
-            f'    {icon} {sub}'
-            f'  </div>'
-            f'</div>'
+            f"    {icon} {sub}"
+            f"  </div>"
+            f"</div>"
         )
         cells.append(cell)
 
@@ -220,6 +239,7 @@ def _pipeline_card(steps: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 # Citation helpers
 # ---------------------------------------------------------------------------
+
 
 def _number_citations(answer: Answer) -> tuple[str, list[dict]]:
     """Replace [TYPE: name, loc] markers with [N] and group multiple locations.
@@ -295,9 +315,7 @@ def _citation_line(cite: dict) -> str:
     if locations and locations[0].startswith("http"):
         if src_type == "YouTube" and len(locations) > 1:
             # Multiple timestamps from the same video — hyperlink each timestamp
-            ts_parts = ", ".join(
-                f'[{_ts_label(loc)}]({loc})' for loc in locations
-            )
+            ts_parts = ", ".join(f"[{_ts_label(loc)}]({loc})" for loc in locations)
             return f"{badge} {name} — {ts_parts}"
         # Web or single-timestamp YouTube — link the source name
         return f"{badge} [{name}]({locations[0]})"

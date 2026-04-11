@@ -1,7 +1,12 @@
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
-from config.settings import GWDG_API_BASE, GWDG_API_KEY, GWDG_MODEL_NAME, MAX_HISTORY_TURNS
+from config.settings import (
+    GWDG_API_BASE,
+    GWDG_API_KEY,
+    GWDG_MODEL_NAME,
+    MAX_HISTORY_TURNS,
+)
 
 _REWRITE_PROMPT = """\
 Given the following conversation history and a follow-up question, \

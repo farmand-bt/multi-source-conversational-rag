@@ -44,22 +44,16 @@ class YouTubeIngestor(Ingestor):
                 transcript_list = self._api.list(video_id)
                 first = next(iter(transcript_list), None)
                 if first is None:
-                    raise ValueError(
-                        f"No transcripts are available for video '{video_id}'."
-                    )
+                    raise ValueError(f"No transcripts are available for video '{video_id}'.")
                 transcript = first.fetch()
             except (VideoUnavailable, CouldNotRetrieveTranscript) as e:
-                raise ValueError(
-                    f"Could not retrieve transcript for '{video_id}': {e}"
-                ) from e
+                raise ValueError(f"Could not retrieve transcript for '{video_id}': {e}") from e
         except TranscriptsDisabled as e:
             raise ValueError(
                 f"Transcripts have been disabled by the owner of video '{video_id}'."
             ) from e
         except (VideoUnavailable, CouldNotRetrieveTranscript) as e:
-            raise ValueError(
-                f"Could not retrieve transcript for '{video_id}': {e}"
-            ) from e
+            raise ValueError(f"Could not retrieve transcript for '{video_id}': {e}") from e
 
         segments = [{"text": s.text.strip(), "start": s.start} for s in transcript]
 
@@ -88,6 +82,7 @@ class YouTubeIngestor(Ingestor):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _extract_video_id(source: str) -> str:
     """Extract the video ID from a URL or return the source as-is if it looks like an ID."""
     source = source.strip()
@@ -103,8 +98,7 @@ def _extract_video_id(source: str) -> str:
 def _fetch_title(video_id: str) -> str | None:
     """Fetch the video title from the YouTube oEmbed endpoint (no API key required)."""
     oembed_url = (
-        f"https://www.youtube.com/oembed"
-        f"?url=https://www.youtube.com/watch?v={video_id}&format=json"
+        f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
     )
     try:
         with urllib.request.urlopen(oembed_url, timeout=5) as resp:

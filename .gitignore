@@ -214,3 +214,6 @@ multi-source-rag-project-plan-prompt1.md
 data/*
 !data/.gitkeep
 .chroma/
+
+# Streamlit secrets (never commit real credentials)
+.streamlit/secrets.toml

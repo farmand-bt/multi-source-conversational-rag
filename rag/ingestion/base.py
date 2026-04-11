@@ -8,17 +8,15 @@ class Document:
     """A chunk of text with its source metadata."""
 
     text: str
-    source_type: str          # "pdf" | "web" | "youtube"
-    source_name: str          # human-readable name (filename, page title, video title)
-    source_id: str            # stable hash used for deletion/deduplication
-    chunk_index: int          # globally sequential index assigned by Chunker across all chunks in a batch
-    ingested_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    source_type: str  # "pdf" | "web" | "youtube"
+    source_name: str  # human-readable name (filename, page title, video title)
+    source_id: str  # stable hash used for deletion/deduplication
+    chunk_index: int  # sequential index assigned by Chunker across all chunks in a batch
+    ingested_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     # Source-type-specific location fields — set whichever applies, leave others None
-    page_number: int | None = None   # PDF
-    url: str | None = None           # web / youtube
-    timestamp: str | None = None     # youtube (e.g. "2:34")
+    page_number: int | None = None  # PDF
+    url: str | None = None  # web / youtube
+    timestamp: str | None = None  # youtube (e.g. "2:34")
 
 
 class Ingestor(ABC):

@@ -23,7 +23,5 @@ class Chunker:
         all_chunks: list[Document] = []
         for doc in documents:
             for text in self._splitter.split_text(doc.text):
-                all_chunks.append(
-                    replace(doc, text=text, chunk_index=len(all_chunks))
-                )
+                all_chunks.append(replace(doc, text=text, chunk_index=len(all_chunks)))
         return all_chunks

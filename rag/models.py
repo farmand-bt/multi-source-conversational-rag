@@ -1,12 +1,9 @@
 import re
 from dataclasses import dataclass
 
-
 # Matches [PDF: name, location], [Web: name, url], [YouTube: name, MM:SS]
 # Location is optional — the third group may be empty if the LLM omits it.
-_CITATION_RE = re.compile(
-    r"\[(PDF|Web|YouTube):\s*([^,\]]+?)(?:\s*,\s*([^\]]+?))?\s*\]"
-)
+_CITATION_RE = re.compile(r"\[(PDF|Web|YouTube):\s*([^,\]]+?)(?:\s*,\s*([^\]]+?))?\s*\]")
 
 
 @dataclass(frozen=True)
@@ -33,6 +30,6 @@ class Answer:
             seen.setdefault((src_type.strip(), name.strip(), loc.strip()), None)
         return cls(
             text=raw_text,
-            citations=tuple(Citation(t, n, l) for t, n, l in seen),
+            citations=tuple(Citation(t, n, loc) for t, n, loc in seen),
             rewritten_query=rewritten_query,
         )

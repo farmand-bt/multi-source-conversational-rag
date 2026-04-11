@@ -9,7 +9,7 @@ _SYSTEM_PROMPT = (
     "After every factual claim, cite its source using exactly one of these formats:\n"
     "  • PDF sources:     [PDF: filename.pdf, page N]\n"
     "  • Web pages:       [Web: page title, URL]\n"
-    "  • YouTube videos:  [YouTube: video title, URL] — copy the URL from the context header exactly\n"
+    "  • YouTube videos:  [YouTube: video title, URL] — copy the URL from the context header\n"
     "Match the citation type to the source type shown in the context header.\n"
     "If the context does not contain enough information to answer, say so clearly."
 )

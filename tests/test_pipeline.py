@@ -5,8 +5,6 @@ RAGPipeline is constructed via __new__ + manual attribute injection so each test
 gets an isolated ChromaStore without touching the real data/ directory.
 """
 
-import pytest
-
 from rag.chunking.chunker import Chunker
 from rag.ingestion.base import Document
 from rag.models import Answer
@@ -73,6 +71,7 @@ def _seed(pipeline, texts: list[str], source_id: str = "seed001") -> None:
 # ask() — read path
 # ------------------------------------------------------------------
 
+
 def test_ask_empty_store_returns_no_info_answer(tmp_path, embedder):
     pipeline = _build_pipeline(tmp_path, embedder)
     answer = pipeline.ask("What is Python?")
@@ -121,7 +120,9 @@ def test_ask_uses_rewritten_query_for_retrieval(tmp_path, embedder):
     class _RewritingMemory:
         def rewrite_query(self, query, history=None):
             return "standalone rewritten question"
-        def clear(self): pass
+
+        def clear(self):
+            pass
 
     pipeline = _build_pipeline(tmp_path, embedder)
     pipeline._retriever = _CapturingRetriever()
@@ -155,7 +156,9 @@ def test_answer_carries_rewritten_query(tmp_path, embedder):
     class _RewritingMemory:
         def rewrite_query(self, query, history=None):
             return "standalone version"
-        def clear(self): pass
+
+        def clear(self):
+            pass
 
     pipeline = _build_pipeline(tmp_path, embedder)
     pipeline._memory = _RewritingMemory()
@@ -170,8 +173,11 @@ def test_clear_history_delegates_to_memory(tmp_path, embedder):
     cleared = []
 
     class _TrackingMemory:
-        def rewrite_query(self, query, history=None): return query
-        def clear(self): cleared.append(True)
+        def rewrite_query(self, query, history=None):
+            return query
+
+        def clear(self):
+            cleared.append(True)
 
     pipeline = _build_pipeline(tmp_path, embedder)
     pipeline._memory = _TrackingMemory()
@@ -182,6 +188,7 @@ def test_clear_history_delegates_to_memory(tmp_path, embedder):
 # ------------------------------------------------------------------
 # list_sources / delete_source
 # ------------------------------------------------------------------
+
 
 def test_list_sources_after_seed(tmp_path, embedder):
     pipeline = _build_pipeline(tmp_path, embedder)
