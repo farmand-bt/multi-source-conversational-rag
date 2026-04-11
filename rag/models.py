@@ -20,9 +20,10 @@ class Citation:
 class Answer:
     text: str
     citations: tuple[Citation, ...] = ()
+    rewritten_query: str = ""  # non-empty when the query was rewritten for retrieval
 
     @classmethod
-    def from_raw(cls, raw_text: str) -> "Answer":
+    def from_raw(cls, raw_text: str, rewritten_query: str = "") -> "Answer":
         """Parse [PDF/Web/YouTube: name, location] markers from raw LLM output.
 
         Preserves first-seen order and deduplicates identical citations.
@@ -33,4 +34,5 @@ class Answer:
         return cls(
             text=raw_text,
             citations=tuple(Citation(t, n, l) for t, n, l in seen),
+            rewritten_query=rewritten_query,
         )

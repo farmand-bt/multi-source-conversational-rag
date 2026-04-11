@@ -10,16 +10,29 @@ _CITE_COLOUR = "#e07b39"  # warm orange for inline citation numbers
 
 
 def render_chat(pipeline: RAGPipeline) -> None:
-    st.header("Chat")
-
     if "messages" not in st.session_state:
         st.session_state.messages = []
+
+    # ── Header row with optional Clear button ─────────────────────────
+    col_title, col_btn = st.columns([5, 1])
+    with col_title:
+        st.header("Chat")
+    with col_btn:
+        if st.session_state.messages:
+            st.write("")  # vertical alignment nudge
+            if st.button("Clear", use_container_width=True, help="Clear conversation history"):
+                st.session_state.messages = []
+                pipeline.clear_history()
+                st.rerun()
 
     # ── Replay all stored messages in order ───────────────────────────
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             if msg["role"] == "assistant":
                 st.markdown(_colorize_refs(msg["content"]), unsafe_allow_html=True)
+                if msg.get("rewritten_query"):
+                    with st.expander("🔍 Query rewritten as", expanded=False):
+                        st.caption(msg["rewritten_query"])
                 if msg.get("citations"):
                     _render_sources(msg["citations"])
             else:
@@ -54,7 +67,12 @@ def render_chat(pipeline: RAGPipeline) -> None:
 
         clean_text, numbered = _number_citations(answer)
         st.session_state.messages.append(
-            {"role": "assistant", "content": clean_text, "citations": numbered}
+            {
+                "role": "assistant",
+                "content": clean_text,
+                "citations": numbered,
+                "rewritten_query": answer.rewritten_query,
+            }
         )
 
         max_msgs = _MAX_HISTORY_TURNS * 2

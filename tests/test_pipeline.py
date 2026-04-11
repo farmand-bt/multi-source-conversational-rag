@@ -24,6 +24,22 @@ class _MockGenerator:
         return f"Mock answer. [PDF: {name}, page {page}]"
 
 
+class _MockMemory:
+    """No-op memory: returns query unchanged, ignores state calls."""
+
+    def rewrite_query(self, query: str, history=None) -> str:
+        return query
+
+    def add_turn(self, user_message: str, assistant_message: str) -> None:
+        pass
+
+    def get_history(self) -> list[dict]:
+        return []
+
+    def clear(self) -> None:
+        pass
+
+
 def _build_pipeline(tmp_path, embedder):
     store = ChromaStore(persist_dir=str(tmp_path / "chroma"))
     pipeline = RAGPipeline.__new__(RAGPipeline)
@@ -33,6 +49,7 @@ def _build_pipeline(tmp_path, embedder):
     pipeline._pdf_ingestor = None  # not needed for read-path tests
     pipeline._retriever = Retriever(embedder, store)
     pipeline._generator = _MockGenerator()
+    pipeline._memory = _MockMemory()
     return pipeline
 
 
@@ -90,6 +107,76 @@ def test_ask_passes_history_to_generator(tmp_path, embedder):
     history = [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "hi"}]
     pipeline.ask("follow-up question", history=history)
     assert received["history"] == history
+
+
+def test_ask_uses_rewritten_query_for_retrieval(tmp_path, embedder):
+    """When history is present, the rewritten query (not the original) is used for retrieval."""
+    retrieved_queries = []
+
+    class _CapturingRetriever:
+        def retrieve(self, query, top_k=5):
+            retrieved_queries.append(query)
+            return []
+
+    class _RewritingMemory:
+        def rewrite_query(self, query, history=None):
+            return "standalone rewritten question"
+        def clear(self): pass
+
+    pipeline = _build_pipeline(tmp_path, embedder)
+    pipeline._retriever = _CapturingRetriever()
+    pipeline._memory = _RewritingMemory()
+
+    history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}]
+    pipeline.ask("follow-up?", history=history)
+
+    assert retrieved_queries == ["standalone rewritten question"]
+
+
+def test_ask_no_history_skips_rewriting(tmp_path, embedder):
+    """Without history the original query goes straight to retrieval."""
+    retrieved_queries = []
+
+    class _CapturingRetriever:
+        def retrieve(self, query, top_k=5):
+            retrieved_queries.append(query)
+            return []
+
+    pipeline = _build_pipeline(tmp_path, embedder)
+    pipeline._retriever = _CapturingRetriever()
+
+    pipeline.ask("original question")
+    assert retrieved_queries == ["original question"]
+
+
+def test_answer_carries_rewritten_query(tmp_path, embedder):
+    """Answer.rewritten_query is populated when rewriting occurs."""
+
+    class _RewritingMemory:
+        def rewrite_query(self, query, history=None):
+            return "standalone version"
+        def clear(self): pass
+
+    pipeline = _build_pipeline(tmp_path, embedder)
+    pipeline._memory = _RewritingMemory()
+    _seed(pipeline, ["Some relevant content."])
+
+    history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}]
+    answer = pipeline.ask("follow-up?", history=history)
+    assert answer.rewritten_query == "standalone version"
+
+
+def test_clear_history_delegates_to_memory(tmp_path, embedder):
+    cleared = []
+
+    class _TrackingMemory:
+        def rewrite_query(self, query, history=None): return query
+        def clear(self): cleared.append(True)
+
+    pipeline = _build_pipeline(tmp_path, embedder)
+    pipeline._memory = _TrackingMemory()
+    pipeline.clear_history()
+    assert cleared == [True]
 
 
 # ------------------------------------------------------------------
