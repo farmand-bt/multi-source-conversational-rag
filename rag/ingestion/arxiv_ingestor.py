@@ -1,4 +1,6 @@
 import re
+import urllib.request
+import xml.etree.ElementTree as ET
 
 import requests
 
@@ -31,7 +33,7 @@ class ArXivIngestor(Ingestor):
         """
         arxiv_id = self._extract_id(source.strip())
         pdf_bytes = self._download(arxiv_id)
-        display_name = source_name or f"arXiv:{arxiv_id}"
+        display_name = source_name or _fetch_title(arxiv_id) or f"arXiv:{arxiv_id}"
         return self._pdf_ingestor.ingest(pdf_bytes, display_name)
 
     # ------------------------------------------------------------------
@@ -58,3 +60,28 @@ class ArXivIngestor(Ingestor):
         except requests.RequestException as e:
             raise ValueError(f"Failed to download arXiv paper '{arxiv_id}': {e}") from e
         return resp.content
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
+
+
+def _fetch_title(arxiv_id: str) -> str | None:
+    """Fetch the paper title from the arXiv public API (no key required)."""
+    api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
+    try:
+        with urllib.request.urlopen(api_url, timeout=10) as resp:
+            xml_data = resp.read().decode()
+        root = ET.fromstring(xml_data)
+        entry = root.find("atom:entry", _ATOM_NS)
+        if entry is not None:
+            title_el = entry.find("atom:title", _ATOM_NS)
+            if title_el is not None and title_el.text:
+                # arXiv titles sometimes contain internal newlines — collapse them
+                return " ".join(title_el.text.split())
+    except Exception:
+        return None
+    return None

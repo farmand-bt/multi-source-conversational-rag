@@ -255,16 +255,23 @@ def _pipeline_card(steps: list[dict]) -> str:
 def _export_chat_pdf(messages: list[dict]) -> bytes:
     """Render the conversation as a PDF and return the raw bytes."""
     from fpdf import FPDF  # lazy import — only needed when Export is clicked
+    from fpdf.enums import XPos, YPos
 
     def _safe(text: str) -> str:
-        """Encode to latin-1 and break long unbreakable tokens (e.g. URLs).
+        """Normalize to latin-1, replacing common Unicode punctuation with ASCII.
 
-        fpdf2 raises FPDFException if a single token is wider than the page —
-        inserting a space every 85 chars gives it a break point without
-        visually disrupting normal prose.
+        em-dash, smart quotes, etc. are not in ISO-8859-1 and must be mapped
+        before encoding, otherwise fpdf2 receives replacement bytes that can
+        confuse its line-break algorithm.  Long unbreakable tokens (URLs) are
+        split at 55 chars so multi_cell always has a break point.
         """
-        # Break any run of 85+ non-space chars (catches long URLs)
-        text = re.sub(r"(\S{85})", r"\1 ", text)
+        text = (
+            text.replace("\u2014", "-").replace("\u2013", "-")  # em/en dash
+            .replace("\u2018", "'").replace("\u2019", "'")  # smart single quotes
+            .replace("\u201c", '"').replace("\u201d", '"')  # smart double quotes
+            .replace("\u2026", "...")  # ellipsis
+        )
+        text = re.sub(r"(\S{55})", r"\1 ", text)
         return text.encode("latin-1", errors="replace").decode("latin-1")
 
     pdf = FPDF()
@@ -284,23 +291,31 @@ def _export_chat_pdf(messages: list[dict]) -> bytes:
         is_user = msg["role"] == "user"
         # Role label
         pdf.set_font("Helvetica", "B", 10)
-        pdf.set_text_color(80, 80, 80) if is_user else pdf.set_text_color(224, 123, 57)
+        if is_user:
+            pdf.set_text_color(80, 80, 80)
+        else:
+            pdf.set_text_color(224, 123, 57)
         pdf.cell(0, 6, "You:" if is_user else "Assistant:", ln=True)
         pdf.set_text_color(0, 0, 0)
-        # Content (strip [N] citation markers for cleaner output)
-        content = re.sub(r"\[\d+\]", "", msg["content"]).strip()
+        # Content — keep [N] markers so inline citations are visible in the PDF
+        content = msg["content"].strip()
         pdf.set_font("Helvetica", size=10)
-        pdf.multi_cell(0, 5, _safe(content))
-        # Citations (if any)
+        pdf.multi_cell(0, 5, _safe(content), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        # Citations — use cell() (clips, never raises) instead of multi_cell().
+        # URLs are replaced with "(link)" since they are not clickable in PDFs.
         for cite in msg.get("citations") or []:
             locs = cite.get("locations") or []
-            loc_str = ", ".join(locs) if locs else ""
-            line = f"  [{cite['num']}] {cite['source_name']}"
-            if loc_str:
-                line += f" — {loc_str}"
-            pdf.set_font("Helvetica", "I", 8)
+            if locs:
+                first = locs[0]
+                loc_suffix = " (link)" if first.startswith("http") else f", {first}"
+                if len(locs) > 1:
+                    loc_suffix += f" +{len(locs) - 1} more"
+            else:
+                loc_suffix = ""
+            line = _safe(f"  [{cite['num']}] {cite['source_name']}{loc_suffix}")
+            pdf.set_font("Helvetica", size=8)
             pdf.set_text_color(120, 120, 120)
-            pdf.multi_cell(0, 4, _safe(line))
+            pdf.multi_cell(0, 4, line, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.set_text_color(0, 0, 0)
         pdf.ln(4)
 

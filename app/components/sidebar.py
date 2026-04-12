@@ -95,7 +95,15 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
                         st.session_state[_YT_KEY] += 1
                         st.rerun()
                     except Exception as exc:
-                        st.error(f"Ingestion failed: {exc}")
+                        err = str(exc).lower()
+                        if any(k in err for k in ("too many", "429", "blocked", "ip")):
+                            st.error(
+                                "YouTube blocked the request — this is common on cloud-hosted "
+                                "apps because YouTube restricts server IPs. "
+                                "Try the locally-hosted app, or try a different video."
+                            )
+                        else:
+                            st.error(f"Ingestion failed: {exc}")
 
         st.divider()
 

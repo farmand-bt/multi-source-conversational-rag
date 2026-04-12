@@ -77,7 +77,7 @@ flowchart TD
 ### Installation
 
 ```bash
-git clone https://github.com/<your-username>/multi-source-conversational-rag.git
+git clone https://github.com/farmand-bt/multi-source-conversational-rag.git
 cd multi-source-conversational-rag
 
 cp .env.example .env          # fill in your API credentials
@@ -160,7 +160,7 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 | Re-ranking | sentence-transformers `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | Vector store | ChromaDB (local, file-persisted) |
 | PDF parsing | PyMuPDF |
-| arXiv ingestion | requests (direct PDF download) |
+| arXiv ingestion | requests (PDF download) + arXiv Atom API (title fetch, no key) |
 | Web extraction | trafilatura |
 | YouTube transcripts | youtube-transcript-api |
 | PDF export | fpdf2 |

@@ -48,9 +48,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`HF_HUB_DISABLE_SYMLINKS_WARNING=1`** should be set in `.env` on Windows to suppress the HuggingFace symlinks warning (cosmetic only).
 
 **Post-M6 notes:**
-- **arXiv ingestion:** `rag/ingestion/arxiv_ingestor.py` parses an arXiv ID from a bare ID (`2305.14283`) or any arXiv URL, downloads the PDF via `requests`, and delegates entirely to `PDFIngestor`. Returned Documents have `source_type="pdf"` and `source_name="arXiv:<id>"`. No new API key required. Pipeline routes `source_type="arxiv"` to `ArXivIngestor`. Sidebar has a dedicated 📜 arXiv section with the same counter-key clear pattern as Web/YouTube.
-- **PDF export:** `app/components/chat.py` exposes a `📥 Export` download button (visible when messages exist) that calls `_export_chat_pdf()`. Uses `fpdf2` (lazy import inside the function). Text is sanitized to latin-1 before writing; citation locations are appended in italics below each assistant message. The button sits in a third header column alongside Clear.
+- **arXiv ingestion:** `rag/ingestion/arxiv_ingestor.py` parses an arXiv ID from a bare ID (`2305.14283`) or any arXiv URL, fetches the paper title from the arXiv Atom API (`export.arxiv.org/api/query`), downloads the PDF via `requests`, and delegates extraction to `PDFIngestor`. Returned Documents have `source_type="pdf"` and `source_name=<paper title>` (falls back to `"arXiv:<id>"` if the API is unreachable). No API key required. Pipeline routes `source_type="arxiv"` to `ArXivIngestor`. Sidebar has a dedicated 📜 arXiv section with the same counter-key clear pattern as Web/YouTube.
+- **PDF export:** `app/components/chat.py` exposes a `📥 Export` download button (visible when messages exist) that calls `_export_chat_pdf()`. Uses `fpdf2` (lazy import inside the function). Common non-latin-1 characters (em-dash, smart quotes, ellipsis) are replaced with ASCII equivalents before encoding; long unbreakable tokens are split at 55 chars. **Critical:** all `multi_cell()` calls must pass `new_x=XPos.LMARGIN, new_y=YPos.NEXT` — fpdf2 2.7+ changed the default to `new_x=XPos.RIGHT`, which leaves the cursor at the right edge and causes the next `multi_cell(0, ...)` to compute available width ≈ 0, raising `FPDFException: Not enough horizontal space`. Inline `[N]` citation markers are preserved in the PDF text. Citation locations (URLs) are replaced with `(link)` since PDFs are not interactive.
 - **`fpdf2>=2.7`** added to `pyproject.toml` dependencies and `requirements.txt` (regenerated via `uv export`).
+- **YouTube ingestion on Streamlit Cloud:** YouTube actively blocks transcript requests from cloud provider IP ranges (AWS/GCP). This is a platform-level restriction — no code fix is possible. The sidebar shows a clear error message when this is detected (keywords: "too many", "429", "blocked", "ip"). YouTube ingestion works normally on a locally-hosted instance.
 
 The authoritative milestone plan is `multi-source-rag-project-plan-prompt1.md`.
 
@@ -89,7 +90,7 @@ A conversational RAG assistant that ingests documents from multiple sources, emb
 3. `Chunker` splits into chunks (`chunk_size=500`, `chunk_overlap=50`) with globally sequential `chunk_index`.
 4. `Embedder` produces 384-dim vectors; `ChromaStore` upserts chunks + embeddings into ChromaDB (`./data/chroma`).
 
-**Read path (M3–M5, fully built):**
+**Read path (fully built):**
 5. User types a query; if there is prior history, `ConversationMemory.rewrite_query()` reformulates it as a standalone question (one LLM call).
 6. `Retriever` embeds the (possibly rewritten) query and fetches the top-k=5 most similar chunks. If re-ranking is enabled, a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) re-scores the candidate pool before applying the per-source cap.
 7. `Generator` calls the GWDG LLM with the **original** query + full history, so the answer is in the conversational context.
@@ -106,6 +107,6 @@ A conversational RAG assistant that ingests documents from multiple sources, emb
 
 - **Ingestor base class must exist from Milestone 1**, even before web/YouTube sources are built. The full metadata schema (`source_type`, `source_name`, `source_id`, `page_number`/`url`/`timestamp`, `chunk_index`, `ingested_at`) must also be consistent across all ingestors from day one — the citation rendering contract in the generator prompt depends on it.
 - **LLM is called only for answer generation and query rewriting** — not for embedding, chunking, or retrieval. Re-ranking uses a local cross-encoder (no API). Embeddings are cached via Chroma's persistence to conserve the limited GWDG API quota.
-- **Citation contract:** the generator prompt must instruct the LLM to produce `[Source: name, location]` formatted citations; the Streamlit UI parses these directly.
+- **Citation contract:** the generator prompt instructs the LLM to produce type-prefixed citations: `[PDF: name, page N]` / `[Web: title, URL]` / `[YouTube: title, timestamped_URL]`. The regex in `rag/models.py` parses these; `app/components/chat.py` replaces them with numbered `[1]`, `[2]` references. Do not change the format without updating both the generator prompt and the regex.
 - **YouTube special case:** transcripts should be chunked by timestamp-boundary segments when possible, not just by character count.
 - **Local-first:** no Docker, no external vector DB — ChromaDB is file-persisted, optimized for Streamlit Cloud deployment.
