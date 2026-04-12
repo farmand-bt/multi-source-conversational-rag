@@ -8,6 +8,10 @@ A conversational AI assistant that lets you ingest documents from **PDFs, web pa
 
 ![Demo](assets/demo.gif)
 
+The demo shows three sources being ingested: a PDF of the paper *"Query Rewriting for Retrieval-Augmented Large Language Models"* (Ma et al., 2023), an AWS web article on RAG, and an IBM YouTube video explaining RAG. Re-ranking is enabled, and two questions are asked — the second is a follow-up that triggers automatic query rewriting. The rewritten query and per-source citations are visible in the UI.
+
+![Demo2](assets/demo2.gif)
+
 ---
 
 ## Features
@@ -170,15 +174,23 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 
 ## Possible Future Improvements
 
-- **Translation** — `youtube-transcript-api` supports `.translate('en').fetch()` on non-English transcripts; useful when auto-generated captions exist only in the video's original language
-- **Re-ranking as default** — once the cross-encoder model is pre-warmed at startup, the added latency becomes negligible
-- **Query expansion** — generate multiple search queries from a single user question and merge results before re-ranking
-- **Streaming answers** — use LangChain's streaming callbacks to show the LLM response token-by-token
-- **Multi-collection support** — separate ChromaDB collections per project / workspace
-- **Evaluation harness** — RAGAS or TruLens metrics (faithfulness, answer relevancy, context precision) for systematic quality tracking
+| Improvement | How | Effort | Cost |
+|---|---|---|---|
+| **Hybrid search** (BM25 + vector) | Add `rank_bm25` for keyword retrieval; merge scores with reciprocal rank fusion before the cross-encoder step | Medium (2–3 days) | Free — local |
+| **More source types** (arXiv, Notion, Google Docs) | `arxiv` library (free, no key); `notion-client` (Notion API token); `google-api-python-client` (OAuth2). Each is a new `Ingestor` subclass | Low–Medium per source | Free tiers available; Google Docs requires OAuth setup |
+| **Streaming LLM responses** | Replace `generator.generate()` with LangChain's `stream()`; render token-by-token with Streamlit's `st.write_stream()` (v1.31+). Main challenge: citation markers only appear in the full response, so parsing must be deferred to stream end | Low–Medium (1–2 days) | Free |
+| **Export conversation as PDF** | Render `st.session_state.messages` to HTML, convert with `weasyprint` or `fpdf2`, serve via `st.download_button` | Medium (1–2 days) | Free |
+| **User authentication** | Streamlit Community Cloud has built-in viewer auth (Google/GitHub). For custom auth: `streamlit-authenticator`. For full multi-user data isolation: per-user ChromaDB collections + a persistent user store | High — requires significant architecture changes for data isolation | Streamlit Cloud free tier supports viewer auth; self-hosting requires a paid server |
+| **YouTube transcript translation** | `youtube-transcript-api` supports `.translate('en').fetch()` on a `Transcript` object — useful when only a non-English auto-caption is available | Low (< 1 day) | Free |
 
 ---
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+## Author
+
+**Farmand Bazdiditehrani** · M.Sc. in Management & Data Science · [farmand.bazdiditehrani@gmail.com](mailto:farmand.bazdiditehrani@gmail.com)
