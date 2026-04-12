@@ -37,6 +37,7 @@ flowchart TD
         A[📄 PDF] --> C
         B[🌐 Web URL] --> C
         D[▶️ YouTube] --> C
+        X[📜 arXiv] --> C
         C[Chunker] --> E[Embedder\nall-MiniLM-L6-v2]
         E --> F[(ChromaDB\nlocal)]
     end
@@ -53,6 +54,9 @@ flowchart TD
     end
 
     F --> J
+    
+    %% Give the edge an id to style it
+    linkStyle 14 stroke:green,stroke-width:2px
 ```
 
 **Data flow:**
@@ -185,4 +189,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Author
 
-**Farmand Bazdiditehrani** · M.Sc. in Management & Data Science · [farmand.bazdiditehrani@gmail.com](mailto:farmand.bazdiditehrani@gmail.com)
+[**Farmand Bazdiditehrani**](https://www.linkedin.com/in/farmand-bt/) · M.Sc. in Management & Data Science · [farmand.bazdiditehrani@gmail.com](mailto:farmand.bazdiditehrani@gmail.com)

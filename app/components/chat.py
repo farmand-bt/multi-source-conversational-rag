@@ -257,7 +257,14 @@ def _export_chat_pdf(messages: list[dict]) -> bytes:
     from fpdf import FPDF  # lazy import — only needed when Export is clicked
 
     def _safe(text: str) -> str:
-        """Encode to latin-1, replacing unsupported characters with '?'."""
+        """Encode to latin-1 and break long unbreakable tokens (e.g. URLs).
+
+        fpdf2 raises FPDFException if a single token is wider than the page —
+        inserting a space every 85 chars gives it a break point without
+        visually disrupting normal prose.
+        """
+        # Break any run of 85+ non-space chars (catches long URLs)
+        text = re.sub(r"(\S{85})", r"\1 ", text)
         return text.encode("latin-1", errors="replace").decode("latin-1")
 
     pdf = FPDF()
