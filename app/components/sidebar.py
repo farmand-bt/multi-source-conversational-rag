@@ -7,11 +7,12 @@ from rag.pipeline import RAGPipeline
 # empty widget — the only reliable way to programmatically clear a text_input.
 _WEB_KEY = "web_url_counter"
 _YT_KEY = "yt_url_counter"
+_ARXIV_KEY = "arxiv_id_counter"
 
 
 def render_sidebar(pipeline: RAGPipeline) -> None:
     # Initialise counters once per session
-    for k in (_WEB_KEY, _YT_KEY):
+    for k in (_WEB_KEY, _YT_KEY, _ARXIV_KEY):
         if k not in st.session_state:
             st.session_state[k] = 0
 
@@ -92,6 +93,36 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
                         n = pipeline.ingest(yt_url, source_type="youtube")
                         st.success(f"Stored {n} chunks")
                         st.session_state[_YT_KEY] += 1
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Ingestion failed: {exc}")
+
+        st.divider()
+
+        # ── arXiv ─────────────────────────────────────────────────────
+        st.subheader("📜 arXiv Paper")
+        arxiv_input = st.text_input(
+            "arXiv ID or URL",
+            placeholder="2305.14283 or https://arxiv.org/abs/2305.14283",
+            label_visibility="collapsed",
+            key=f"arxiv_id_{st.session_state[_ARXIV_KEY]}",
+        )
+        if arxiv_input:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                ingest_arxiv = st.button(
+                    "Ingest", type="primary", use_container_width=True, key="btn_ingest_arxiv"
+                )
+            with col2:
+                if st.button("Clear", use_container_width=True, key="btn_clear_arxiv"):
+                    st.session_state[_ARXIV_KEY] += 1
+                    st.rerun()
+            if ingest_arxiv:
+                with st.spinner("Downloading PDF from arXiv…"):
+                    try:
+                        n = pipeline.ingest(arxiv_input, source_type="arxiv")
+                        st.success(f"Stored {n} chunks")
+                        st.session_state[_ARXIV_KEY] += 1
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Ingestion failed: {exc}")

@@ -1,6 +1,7 @@
 from rag.chunking.chunker import Chunker
 from rag.embeddings.embedder import Embedder
 from rag.generation.generator import Generator
+from rag.ingestion.arxiv_ingestor import ArXivIngestor
 from rag.ingestion.pdf_ingestor import PDFIngestor
 from rag.ingestion.web_ingestor import WebIngestor
 from rag.ingestion.youtube_ingestor import YouTubeIngestor
@@ -28,6 +29,7 @@ class RAGPipeline:
         self._pdf_ingestor = PDFIngestor()
         self._web_ingestor = WebIngestor()
         self._yt_ingestor = YouTubeIngestor()
+        self._arxiv_ingestor = ArXivIngestor()
         self._retriever = Retriever(self._embedder, self._store)
         self._generator: Generator | None = None  # lazy: avoids startup failure without GWDG creds
         self._memory = ConversationMemory()
@@ -53,6 +55,8 @@ class RAGPipeline:
             docs = self._web_ingestor.ingest(source, source_name)
         elif source_type == "youtube":
             docs = self._yt_ingestor.ingest(source, source_name)
+        elif source_type == "arxiv":
+            docs = self._arxiv_ingestor.ingest(source, source_name)
         else:
             raise ValueError(f"Unknown source type: '{source_type}'")
 

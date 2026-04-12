@@ -1,6 +1,8 @@
 # Multi-Source Conversational RAG Assistant
 
-A conversational AI assistant that lets you ingest documents from **PDFs, web pages, and YouTube videos**, then ask natural-language questions with multi-turn memory and source citations — all running locally with no external vector database.
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://multi-source-conversational-rag.streamlit.app/)
+
+A conversational AI assistant that lets you ingest documents from **PDFs, arXiv papers, web pages, and YouTube videos**, then ask natural-language questions with multi-turn memory and source citations — all running locally with no external vector database.
 
 ---
 
@@ -8,9 +10,7 @@ A conversational AI assistant that lets you ingest documents from **PDFs, web pa
 
 ![Demo](assets/demo.gif)
 
-The demo shows three sources being ingested: a PDF of the paper *"Query Rewriting for Retrieval-Augmented Large Language Models"* (Ma et al., 2023), an AWS web article on RAG, and an IBM YouTube video explaining RAG. Re-ranking is enabled, and two questions are asked — the second is a follow-up that triggers automatic query rewriting. The rewritten query and per-source citations are visible in the UI.
-
-![Demo2](assets/demo2.gif)
+The demo shows three sources being ingested: a PDF of the paper [*"Query Rewriting for Retrieval-Augmented Large Language Models"* (Ma et al., 2023)](https://arxiv.org/abs/2305.14283), an [AWS web article on RAG](https://aws.amazon.com/what-is/retrieval-augmented-generation/), and an [IBM YouTube video explaining RAG](https://www.youtube.com/watch?v=qppV3n3YlF8). Re-ranking is enabled, and two questions are asked — the second is a follow-up that triggers automatic query rewriting. The rewritten query and per-source citations are visible in the UI.
 
 ---
 
@@ -18,13 +18,14 @@ The demo shows three sources being ingested: a PDF of the paper *"Query Rewritin
 
 | Feature | Details |
 |---|---|
-| **Multi-source ingestion** | PDF upload · Web URL (trafilatura) · YouTube transcript (youtube-transcript-api) |
+| **Multi-source ingestion** | PDF upload · arXiv paper (by ID or URL) · Web URL (trafilatura) · YouTube transcript (youtube-transcript-api) |
 | **Semantic search** | Sentence-transformer embeddings (`all-MiniLM-L6-v2`) stored in local ChromaDB |
 | **Source diversity** | Per-source retrieval cap ensures multiple sources contribute to every answer |
 | **Conversational memory** | Follow-up questions resolved via LLM query rewriting before retrieval |
 | **Source citations** | Numbered `[1]`, `[2]` inline citations with a collapsible Sources expander; YouTube links are timestamped |
 | **Re-ranking (opt-in)** | Cross-encoder (`ms-marco-MiniLM-L-6-v2`) re-scores retrieved chunks — runs locally, no API needed |
 | **Live pipeline display** | Step-by-step progress card (Rewrite → Retrieve → Generate) visible while the model thinks |
+| **Export conversation** | Download the full chat as a PDF with one click |
 
 ---
 
@@ -80,6 +81,8 @@ make install                  # creates .venv and installs all dependencies
 make run                      # launches the Streamlit app at http://localhost:8501
 ```
 
+> **First run:** the embedding model (`all-MiniLM-L6-v2`, ~90 MB) and re-ranking model (`ms-marco-MiniLM-L-6-v2`, ~90 MB) are downloaded from HuggingFace on first use and cached locally. Expect a one-time wait of 1–2 minutes on a typical connection.
+
 ### Environment variables
 
 Copy `.env.example` to `.env` and fill in:
@@ -91,18 +94,6 @@ Copy `.env.example` to `.env` and fill in:
 | `GWDG_MODEL_NAME` | ✅ | Model name, e.g. `meta-llama-3.1-70b-instruct` |
 | `HF_TOKEN` | ☑️ optional | HuggingFace token — only needed to access gated models. The embedding and re-ranking models used here are public, so this can be left empty. |
 | `HF_HUB_DISABLE_SYMLINKS_WARNING` | ☑️ optional | Set to `1` on Windows to suppress a cosmetic HuggingFace cache warning (no functional impact). |
-
----
-
-## Deployment on Streamlit Community Cloud
-
-1. Push the repo to GitHub.
-2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**.
-3. Set **Main file path** to `app/app.py`.
-4. Under **Advanced settings → Secrets**, paste the contents of `.streamlit/secrets.toml.example` with your real credentials.
-5. Deploy — Streamlit Cloud installs from `requirements.txt` automatically.
-
-> The bi-encoder and cross-encoder models (~90 MB each) are downloaded from HuggingFace on first use and cached for the session lifetime.
 
 ---
 
@@ -133,7 +124,8 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 │   │   ├── base.py             # Document dataclass + Ingestor ABC
 │   │   ├── pdf_ingestor.py     # PyMuPDF — one Document per page
 │   │   ├── web_ingestor.py     # trafilatura — article extraction
-│   │   └── youtube_ingestor.py # youtube-transcript-api — timestamp-bounded chunks
+│   │   ├── youtube_ingestor.py # youtube-transcript-api — timestamp-bounded chunks
+│   │   └── arxiv_ingestor.py   # downloads arXiv PDF by ID or URL → delegates to PDFIngestor
 │   ├── chunking/chunker.py     # RecursiveCharacterTextSplitter wrapper
 │   ├── embeddings/embedder.py  # sentence-transformers bi-encoder
 │   ├── vectorstore/chroma_store.py
@@ -164,8 +156,10 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 | Re-ranking | sentence-transformers `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | Vector store | ChromaDB (local, file-persisted) |
 | PDF parsing | PyMuPDF |
+| arXiv ingestion | requests (direct PDF download) |
 | Web extraction | trafilatura |
 | YouTube transcripts | youtube-transcript-api |
+| PDF export | fpdf2 |
 | Linting / formatting | Ruff |
 | Testing | pytest |
 | Package management | uv |
@@ -177,11 +171,9 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 | Improvement | How | Effort | Cost |
 |---|---|---|---|
 | **Hybrid search** (BM25 + vector) | Add `rank_bm25` for keyword retrieval; merge scores with reciprocal rank fusion before the cross-encoder step | Medium (2–3 days) | Free — local |
-| **More source types** (arXiv, Notion, Google Docs) | `arxiv` library (free, no key); `notion-client` (Notion API token); `google-api-python-client` (OAuth2). Each is a new `Ingestor` subclass | Low–Medium per source | Free tiers available; Google Docs requires OAuth setup |
-| **Streaming LLM responses** | Replace `generator.generate()` with LangChain's `stream()`; render token-by-token with Streamlit's `st.write_stream()` (v1.31+). Main challenge: citation markers only appear in the full response, so parsing must be deferred to stream end | Low–Medium (1–2 days) | Free |
-| **Export conversation as PDF** | Render `st.session_state.messages` to HTML, convert with `weasyprint` or `fpdf2`, serve via `st.download_button` | Medium (1–2 days) | Free |
-| **User authentication** | Streamlit Community Cloud has built-in viewer auth (Google/GitHub). For custom auth: `streamlit-authenticator`. For full multi-user data isolation: per-user ChromaDB collections + a persistent user store | High — requires significant architecture changes for data isolation | Streamlit Cloud free tier supports viewer auth; self-hosting requires a paid server |
-| **YouTube transcript translation** | `youtube-transcript-api` supports `.translate('en').fetch()` on a `Transcript` object — useful when only a non-English auto-caption is available | Low (< 1 day) | Free |
+| **More source types** (Notion, Google Docs) | `notion-client` (Notion API token); `google-api-python-client` (OAuth2). Each is a new `Ingestor` subclass | Medium per source | Free tiers available; Google Docs requires OAuth setup |
+| **Streaming LLM responses** | Replace `generator.generate()` with LangChain's `stream()`; render token-by-token with Streamlit's `st.write_stream()` (v1.31+). Citation marker parsing must be deferred to stream end | Low–Medium (1–2 days) | Free |
+| **User authentication** | Streamlit Community Cloud has built-in viewer auth (Google/GitHub). For custom auth: `streamlit-authenticator`. Full multi-user data isolation requires per-user ChromaDB collections | High — significant architecture change | Streamlit Cloud free tier supports viewer auth |
 
 ---
 

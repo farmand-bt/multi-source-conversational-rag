@@ -19,6 +19,7 @@ dependencies = [
     "youtube-transcript-api>=0.6",
     "streamlit>=1.39",
     "python-dotenv>=1.0",
+    "fpdf2>=2.7",
 ]
 
 [project.optional-dependencies]

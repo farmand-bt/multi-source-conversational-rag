@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 import streamlit as st
 
@@ -28,13 +29,23 @@ def render_chat(pipeline: RAGPipeline) -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # ── Header row with optional Clear button ─────────────────────────
-    col_title, col_btn = st.columns([5, 1])
+    # ── Header row with Export + Clear buttons ────────────────────────
+    col_title, col_export, col_clear = st.columns([4, 1, 1])
     with col_title:
         st.header("Chat")
-    with col_btn:
-        if st.session_state.messages:
+    if st.session_state.messages:
+        with col_export:
             st.write("")  # vertical alignment nudge
+            st.download_button(
+                "📥 Export",
+                data=_export_chat_pdf(st.session_state.messages),
+                file_name=f"conversation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                help="Download conversation as PDF",
+            )
+        with col_clear:
+            st.write("")
             if st.button("Clear", use_container_width=True, help="Clear conversation history"):
                 st.session_state.messages = []
                 pipeline.clear_history()
@@ -234,6 +245,59 @@ def _pipeline_card(steps: list[dict]) -> str:
         f"{inner}"
         "</div>"
     )
+
+
+# ---------------------------------------------------------------------------
+# PDF export
+# ---------------------------------------------------------------------------
+
+
+def _export_chat_pdf(messages: list[dict]) -> bytes:
+    """Render the conversation as a PDF and return the raw bytes."""
+    from fpdf import FPDF  # lazy import — only needed when Export is clicked
+
+    def _safe(text: str) -> str:
+        """Encode to latin-1, replacing unsupported characters with '?'."""
+        return text.encode("latin-1", errors="replace").decode("latin-1")
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Title
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, "Conversation Export", ln=True)
+    pdf.set_font("Helvetica", size=9)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 6, _safe(datetime.now().strftime("%Y-%m-%d %H:%M")), ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(4)
+
+    for msg in messages:
+        is_user = msg["role"] == "user"
+        # Role label
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(80, 80, 80) if is_user else pdf.set_text_color(224, 123, 57)
+        pdf.cell(0, 6, "You:" if is_user else "Assistant:", ln=True)
+        pdf.set_text_color(0, 0, 0)
+        # Content (strip [N] citation markers for cleaner output)
+        content = re.sub(r"\[\d+\]", "", msg["content"]).strip()
+        pdf.set_font("Helvetica", size=10)
+        pdf.multi_cell(0, 5, _safe(content))
+        # Citations (if any)
+        for cite in msg.get("citations") or []:
+            locs = cite.get("locations") or []
+            loc_str = ", ".join(locs) if locs else ""
+            line = f"  [{cite['num']}] {cite['source_name']}"
+            if loc_str:
+                line += f" — {loc_str}"
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_text_color(120, 120, 120)
+            pdf.multi_cell(0, 4, _safe(line))
+            pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+
+    return bytes(pdf.output())
 
 
 # ---------------------------------------------------------------------------

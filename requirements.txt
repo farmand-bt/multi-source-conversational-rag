@@ -75,7 +75,9 @@ dataclasses-json==0.6.7
 dateparser==1.4.0
     # via htmldate
 defusedxml==0.7.1
-    # via youtube-transcript-api
+    # via
+    #   fpdf2
+    #   youtube-transcript-api
 distro==1.9.0
     # via openai
 durationpy==0.10
@@ -88,6 +90,10 @@ filelock==3.25.2
     #   torch
 flatbuffers==25.12.19
     # via onnxruntime
+fonttools==4.62.1
+    # via fpdf2
+fpdf2==2.8.7
+    # via multi-source-conversational-rag
 frozenlist==1.8.0
     # via
     #   aiohttp
@@ -354,7 +360,9 @@ pandas==2.3.3 ; python_full_version < '3.11'
 pandas==3.0.2 ; python_full_version >= '3.11'
     # via streamlit
 pillow==12.2.0
-    # via streamlit
+    # via
+    #   fpdf2
+    #   streamlit
 propcache==0.4.1
     # via
     #   aiohttp

@@ -39,13 +39,16 @@ class YouTubeIngestor(Ingestor):
             # Try English first (covers manual + auto-generated English captions)
             transcript = self._api.fetch(video_id, languages=["en", "en-US", "en-GB"])
         except NoTranscriptFound:
-            # Fall back to any available transcript (other languages, auto-generated)
+            # Fall back to any available transcript, translating to English if possible
             try:
                 transcript_list = self._api.list(video_id)
                 first = next(iter(transcript_list), None)
                 if first is None:
                     raise ValueError(f"No transcripts are available for video '{video_id}'.")
-                transcript = first.fetch()
+                try:
+                    transcript = first.translate("en").fetch()
+                except Exception:
+                    transcript = first.fetch()  # use original language if translation fails
             except (VideoUnavailable, CouldNotRetrieveTranscript) as e:
                 raise ValueError(f"Could not retrieve transcript for '{video_id}': {e}") from e
         except TranscriptsDisabled as e:
