@@ -3,6 +3,7 @@ from datetime import datetime
 
 import streamlit as st
 
+from config.settings import MAX_QUESTIONS_PER_SESSION
 from rag.models import _CITATION_RE, Answer
 from rag.pipeline import RAGPipeline
 
@@ -28,6 +29,8 @@ def render_chat(pipeline: RAGPipeline) -> None:
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "question_count" not in st.session_state:
+        st.session_state.question_count = 0
 
     # ── Header row with Export + Clear buttons ────────────────────────
     col_title, col_export, col_clear = st.columns([4, 1, 1])
@@ -65,22 +68,35 @@ def render_chat(pipeline: RAGPipeline) -> None:
                 st.write(msg["content"])
 
     has_sources = bool(pipeline.list_sources())
-    placeholder = (
-        "Ask a question about your documents…"
-        if has_sources
-        else "Ingest a source from the sidebar first."
+    limit_reached = (
+        MAX_QUESTIONS_PER_SESSION > 0
+        and st.session_state.question_count >= MAX_QUESTIONS_PER_SESSION
     )
 
+    if limit_reached:
+        st.warning(
+            f"You've reached the session limit of {MAX_QUESTIONS_PER_SESSION} questions. "
+            "Refresh the page to start a new session."
+        )
+        placeholder = "Session limit reached."
+    elif has_sources:
+        remaining = MAX_QUESTIONS_PER_SESSION - st.session_state.question_count
+        placeholder = (
+            f"Ask a question… ({remaining} question{'s' if remaining != 1 else ''} remaining)"
+            if MAX_QUESTIONS_PER_SESSION > 0
+            else "Ask a question about your documents…"
+        )
+    else:
+        placeholder = "Ingest a source from the sidebar first."
+
     # ── Handle new input ──────────────────────────────────────────────
-    # NOTE: we store everything to session state and call st.rerun() so
-    # that all messages replay in the loop above — in the correct order,
-    # above the chat input widget.
-    if prompt := st.chat_input(placeholder, disabled=not has_sources):
+    if prompt := st.chat_input(placeholder, disabled=not has_sources or limit_reached):
         # Build history from current messages BEFORE appending the new one
         history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages][
             -_MAX_HISTORY_TURNS * 2 :
         ]
 
+        st.session_state.question_count += 1
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         # Show the question immediately so it's visible while the model thinks

@@ -22,10 +22,10 @@ class RAGPipeline:
         ask() -> [ConversationMemory rewrite] -> Retriever -> Generator -> Answer
     """
 
-    def __init__(self) -> None:
-        self._embedder = Embedder()  # loads sentence-transformer model once
+    def __init__(self, embedder: Embedder | None = None, ephemeral: bool = False) -> None:
+        self._embedder = embedder or Embedder()  # accepts a pre-loaded shared embedder
         self._chunker = Chunker()
-        self._store = ChromaStore()
+        self._store = ChromaStore(ephemeral=ephemeral)
         self._pdf_ingestor = PDFIngestor()
         self._web_ingestor = WebIngestor()
         self._yt_ingestor = YouTubeIngestor()

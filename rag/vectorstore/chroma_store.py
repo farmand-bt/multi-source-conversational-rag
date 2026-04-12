@@ -9,9 +9,14 @@ class ChromaStore:
 
     _COLLECTION = "documents"
 
-    def __init__(self, persist_dir: str | None = None) -> None:
-        path = persist_dir or CHROMA_PERSIST_DIR
-        self._client = chromadb.PersistentClient(path=path)
+    def __init__(self, persist_dir: str | None = None, ephemeral: bool = False) -> None:
+        if ephemeral:
+            # In-memory only — data lives for the lifetime of this object (one user session).
+            # Use this on multi-user deployments to prevent cross-user data leakage.
+            self._client = chromadb.EphemeralClient()
+        else:
+            path = persist_dir or CHROMA_PERSIST_DIR
+            self._client = chromadb.PersistentClient(path=path)
         # cosine similarity is standard for sentence-transformer embeddings
         self._collection = self._client.get_or_create_collection(
             name=self._COLLECTION,

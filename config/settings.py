@@ -43,5 +43,8 @@ RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # local cross-encoder, no
 # Memory
 MAX_HISTORY_TURNS = 10
 
+# Public app guardrail — max LLM questions per browser session (0 = unlimited)
+MAX_QUESTIONS_PER_SESSION = 10
+
 # Vector store — absolute path so it resolves correctly regardless of cwd
 CHROMA_PERSIST_DIR = str(Path(__file__).parent.parent / "data" / "chroma")
