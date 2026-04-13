@@ -24,10 +24,15 @@ class RAGPipeline:
         ask() -> [ConversationMemory rewrite] -> Retriever -> Generator -> Answer
     """
 
-    def __init__(self, embedder: Embedder | None = None, ephemeral: bool = False) -> None:
+    def __init__(
+        self,
+        embedder: Embedder | None = None,
+        ephemeral: bool = False,
+        collection_name: str = "documents",
+    ) -> None:
         self._embedder = embedder or Embedder()  # accepts a pre-loaded shared embedder
         self._chunker = Chunker()
-        self._store = ChromaStore(ephemeral=ephemeral)
+        self._store = ChromaStore(ephemeral=ephemeral, collection_name=collection_name)
         self._pdf_ingestor = PDFIngestor()
         self._web_ingestor = WebIngestor()
         self._yt_ingestor = YouTubeIngestor()

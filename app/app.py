@@ -1,3 +1,5 @@
+import uuid
+
 import streamlit as st
 from components.chat import render_chat
 from components.sidebar import render_sidebar
@@ -25,14 +27,17 @@ def _get_shared_embedder() -> Embedder:
 def _get_pipeline() -> RAGPipeline:
     """Return the per-session pipeline, creating it on first access.
 
-    Each user session gets its own ephemeral (in-memory) ChromaDB so that
-    ingested sources are fully isolated between users.  The expensive embedder
-    model is shared via _get_shared_embedder().
+    Each user session gets its own ephemeral (in-memory) ChromaDB collection
+    with a UUID name.  ChromaDB 1.x (Rust backend) shares in-process memory
+    between EphemeralClient instances, so a unique collection name per session
+    is required for true data isolation between concurrent users.
+    The expensive embedder model is shared via _get_shared_embedder().
     """
     if "pipeline" not in st.session_state:
         st.session_state.pipeline = RAGPipeline(
             embedder=_get_shared_embedder(),
             ephemeral=True,
+            collection_name=f"session_{uuid.uuid4().hex}",
         )
     return st.session_state.pipeline
 

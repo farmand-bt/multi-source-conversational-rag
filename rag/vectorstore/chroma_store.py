@@ -7,19 +7,26 @@ from rag.ingestion.base import Document
 class ChromaStore:
     """ChromaDB wrapper. Embeddings are computed externally and passed in explicitly."""
 
-    _COLLECTION = "documents"
-
-    def __init__(self, persist_dir: str | None = None, ephemeral: bool = False) -> None:
+    def __init__(
+        self,
+        persist_dir: str | None = None,
+        ephemeral: bool = False,
+        collection_name: str = "documents",
+    ) -> None:
+        # Each ephemeral session must use a unique collection name.
+        # ChromaDB 1.x with the Rust backend shares in-process memory between
+        # EphemeralClient() instances, so all clients that use the same collection
+        # name "documents" would see each other's data.  A per-session UUID name
+        # keeps collections fully isolated without requiring separate processes.
+        self._collection_name = collection_name
         if ephemeral:
-            # In-memory only — data lives for the lifetime of this object (one user session).
-            # Use this on multi-user deployments to prevent cross-user data leakage.
             self._client = chromadb.EphemeralClient()
         else:
             path = persist_dir or CHROMA_PERSIST_DIR
             self._client = chromadb.PersistentClient(path=path)
         # cosine similarity is standard for sentence-transformer embeddings
         self._collection = self._client.get_or_create_collection(
-            name=self._COLLECTION,
+            name=self._collection_name,
             metadata={"hnsw:space": "cosine"},
         )
 
@@ -42,9 +49,9 @@ class ChromaStore:
 
     def delete_all(self) -> None:
         """Drop and recreate the collection, removing every stored chunk."""
-        self._client.delete_collection(self._COLLECTION)
+        self._client.delete_collection(self._collection_name)
         self._collection = self._client.get_or_create_collection(
-            name=self._COLLECTION,
+            name=self._collection_name,
             metadata={"hnsw:space": "cosine"},
         )
 
