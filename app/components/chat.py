@@ -3,7 +3,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from config.settings import MAX_QUESTIONS_PER_SESSION
+from config.settings import MAX_CHUNKS_PER_SOURCE, MAX_QUESTIONS_PER_SESSION, TOP_K
 from rag.models import _CITATION_RE, Answer
 from rag.pipeline import RAGPipeline
 
@@ -73,6 +73,9 @@ def render_chat(pipeline: RAGPipeline) -> None:
         and st.session_state.question_count >= MAX_QUESTIONS_PER_SESSION
     )
 
+    if has_sources and not limit_reached:
+        st.caption("💡 Tip: specific questions get better results than broad ones.")
+
     if limit_reached:
         st.warning(
             f"You've reached the session limit of {MAX_QUESTIONS_PER_SESSION} questions. "
@@ -104,7 +107,9 @@ def render_chat(pipeline: RAGPipeline) -> None:
             st.write(prompt)
 
         rerank = st.session_state.get("use_reranking", False)
-        answer = _run_pipeline(pipeline, prompt, history, rerank)
+        top_k = st.session_state.get("top_k", TOP_K)
+        max_chunks = st.session_state.get("max_chunks_per_source", MAX_CHUNKS_PER_SOURCE)
+        answer = _run_pipeline(pipeline, prompt, history, rerank, top_k, max_chunks)
 
         clean_text, numbered = _number_citations(answer)
         st.session_state.messages.append(
@@ -133,6 +138,8 @@ def _run_pipeline(
     prompt: str,
     history: list[dict],
     rerank: bool,
+    top_k: int = TOP_K,
+    max_chunks_per_source: int = MAX_CHUNKS_PER_SOURCE,
 ) -> Answer:
     """Execute rewrite → retrieve → generate with a live step-by-step progress card.
 
@@ -174,7 +181,9 @@ def _run_pipeline(
     retrieve_idx = 1 if has_history else 0
     steps[retrieve_idx]["state"] = "active"
     _render()
-    docs = pipeline.retrieve(rewritten, rerank=rerank)
+    docs = pipeline.retrieve(
+        rewritten, rerank=rerank, top_k=top_k, max_chunks_per_source=max_chunks_per_source
+    )
     steps[retrieve_idx]["state"] = "done"
     n = len(docs)
     steps[retrieve_idx]["detail"] = f"{n} chunk{'s' if n != 1 else ''} found"
@@ -282,9 +291,12 @@ def _export_chat_pdf(messages: list[dict]) -> bytes:
         split at 55 chars so multi_cell always has a break point.
         """
         text = (
-            text.replace("\u2014", "-").replace("\u2013", "-")  # em/en dash
-            .replace("\u2018", "'").replace("\u2019", "'")  # smart single quotes
-            .replace("\u201c", '"').replace("\u201d", '"')  # smart double quotes
+            text.replace("\u2014", "-")
+            .replace("\u2013", "-")  # em/en dash
+            .replace("\u2018", "'")
+            .replace("\u2019", "'")  # smart single quotes
+            .replace("\u201c", '"')
+            .replace("\u201d", '"')  # smart double quotes
             .replace("\u2026", "...")  # ellipsis
         )
         text = re.sub(r"(\S{55})", r"\1 ", text)

@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/Ruff-Linting-D7FF64?logoColor=black" alt="Ruff" />
 </p>
 
-A conversational AI assistant that lets you ingest documents from **PDFs, arXiv papers, web pages, and YouTube videos**, then ask natural-language questions with multi-turn memory and source citations — all running locally with no external vector database.
+A conversational AI assistant that lets you ingest content from **PDFs, arXiv papers, web pages, YouTube videos, or plain pasted text**, then ask natural-language questions with multi-turn memory and source citations — all running locally with no external vector database.
 
 ---
 
@@ -59,12 +59,13 @@ The demo walks through the full pipeline end-to-end:
 
 | Feature | Details |
 |---|---|
-| **Multi-source ingestion** | PDF upload · arXiv paper (by ID or URL) · Web URL (trafilatura) · YouTube transcript (youtube-transcript-api) |
+| **Multi-source ingestion** | PDF upload · arXiv paper (by ID or URL) · Web URL (trafilatura) · YouTube transcript (youtube-transcript-api) · plain text (paste) |
 | **Semantic search** | Sentence-transformer embeddings (`all-MiniLM-L6-v2`) stored in local ChromaDB |
 | **Source diversity** | Per-source retrieval cap ensures multiple sources contribute to every answer |
 | **Conversational memory** | Follow-up questions resolved via LLM query rewriting before retrieval |
 | **Source citations** | Numbered `[1]`, `[2]` inline citations with a collapsible Sources expander; YouTube links are timestamped |
 | **Re-ranking (opt-in)** | Cross-encoder (`ms-marco-MiniLM-L-6-v2`) re-scores retrieved chunks — runs locally, no API needed |
+| **Retrieval tuning** | Top K chunks (3–15) and max-per-source cap (1–5) are adjustable via sidebar sliders per query |
 | **Live pipeline display** | Step-by-step progress card (Rewrite → Retrieve → Generate) visible while the model thinks |
 | **Export conversation** | Download the full chat as a PDF with one click |
 
@@ -79,6 +80,7 @@ flowchart TD
         B[🌐 Web URL] --> C
         D[▶️ YouTube] --> C
         X[📜 arXiv] --> C
+        Y[📝 Paste Text] --> C
         C[Chunker] --> E[Embedder\nall-MiniLM-L6-v2]
         E --> F[(ChromaDB\nlocal)]
     end
@@ -97,7 +99,7 @@ flowchart TD
     F --> J
 
     %% Give the edge an id to style it
-    linkStyle 14 stroke:green,stroke-width:2px
+    linkStyle 15 stroke:green,stroke-width:2px
 ```
 
 **Data flow:**
@@ -172,7 +174,8 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 │   │   ├── pdf_ingestor.py     # PyMuPDF — one Document per page
 │   │   ├── web_ingestor.py     # trafilatura — article extraction
 │   │   ├── youtube_ingestor.py # youtube-transcript-api — timestamp-bounded chunks
-│   │   └── arxiv_ingestor.py   # downloads arXiv PDF by ID or URL → delegates to PDFIngestor
+│   │   ├── arxiv_ingestor.py   # downloads arXiv PDF by ID or URL → delegates to PDFIngestor
+│   │   └── text_ingestor.py    # plain text paste — one Document, no location metadata
 │   ├── chunking/chunker.py     # RecursiveCharacterTextSplitter wrapper
 │   ├── embeddings/embedder.py  # sentence-transformers bi-encoder
 │   ├── vectorstore/chroma_store.py
@@ -207,6 +210,7 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 | Web extraction | trafilatura |
 | YouTube transcripts | youtube-transcript-api |
 | PDF export | fpdf2 |
+| Browser timezone detection | streamlit-javascript · tzdata |
 | Linting / formatting | Ruff |
 | Testing | pytest |
 | Package management | uv |
@@ -220,7 +224,7 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 | **Hybrid search** (BM25 + vector) | Add `rank_bm25` for keyword retrieval; merge scores with reciprocal rank fusion before the cross-encoder step | Medium (2–3 days) | Free — local |
 | **More source types** (Notion, Google Docs) | `notion-client` (Notion API token); `google-api-python-client` (OAuth2). Each is a new `Ingestor` subclass | Medium per source | Free tiers available; Google Docs requires OAuth setup |
 | **Streaming LLM responses** | Replace `generator.generate()` with LangChain's `stream()`; render token-by-token with Streamlit's `st.write_stream()` (v1.31+). Citation marker parsing must be deferred to stream end | Low–Medium (1–2 days) | Free |
-| **User authentication** | Streamlit Community Cloud has built-in viewer auth (Google/GitHub). For custom auth: `streamlit-authenticator`. Full multi-user data isolation requires per-user ChromaDB collections | High — significant architecture change | Streamlit Cloud free tier supports viewer auth |
+| **User authentication** | Per-session data isolation is already implemented (ephemeral in-memory ChromaDB per session). Remaining work: login/access control via Streamlit Community Cloud viewer auth (Google/GitHub) or `streamlit-authenticator` | Medium | Streamlit Cloud free tier supports viewer auth |
 
 ---
 

@@ -1,18 +1,20 @@
 import streamlit as st
 
+from config.settings import MAX_CHUNKS_PER_SOURCE, TOP_K
 from rag.pipeline import RAGPipeline
 
-# Each counter controls the widget key for the matching URL input.
+# Each counter controls the widget key for the matching input.
 # Incrementing it on the next rerun forces Streamlit to create a fresh,
 # empty widget — the only reliable way to programmatically clear a text_input.
 _WEB_KEY = "web_url_counter"
 _YT_KEY = "yt_url_counter"
 _ARXIV_KEY = "arxiv_id_counter"
+_TEXT_KEY = "text_paste_counter"
 
 
 def render_sidebar(pipeline: RAGPipeline) -> None:
     # Initialise counters once per session
-    for k in (_WEB_KEY, _YT_KEY, _ARXIV_KEY):
+    for k in (_WEB_KEY, _YT_KEY, _ARXIV_KEY, _TEXT_KEY):
         if k not in st.session_state:
             st.session_state[k] = 0
 
@@ -100,7 +102,9 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
                             st.error(
                                 "YouTube blocked the request — this is common on cloud-hosted "
                                 "apps because YouTube restricts server IPs. "
-                                "Try the locally-hosted app, or try a different video."
+                                "Use the **Paste Text** section below instead: open the video "
+                                "on YouTube, click **···** below the video → **Show transcript**, "
+                                "select all the text, and paste it there."
                             )
                         else:
                             st.error(f"Ingestion failed: {exc}")
@@ -137,6 +141,48 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
 
         st.divider()
 
+        # ── Paste Text ────────────────────────────────────────────────
+        st.subheader("📝 Paste Text")
+        st.caption(
+            "Paste any text content — e.g. a YouTube transcript, meeting notes, or any "
+            "article you copied manually."
+        )
+        text_name = st.text_input(
+            "Source name",
+            placeholder="Source Name: YouTube transcript, Meeting notes, etc.",
+            label_visibility="collapsed",
+            key=f"text_name_{st.session_state[_TEXT_KEY]}",
+        )
+        text_content = st.text_area(
+            "Content",
+            placeholder="Paste your text here…",
+            height=150,
+            label_visibility="collapsed",
+            key=f"text_content_{st.session_state[_TEXT_KEY]}",
+        )
+        if text_content.strip():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                ingest_text = st.button(
+                    "Ingest", type="primary", use_container_width=True, key="btn_ingest_text"
+                )
+            with col2:
+                if st.button("Clear", use_container_width=True, key="btn_clear_text"):
+                    st.session_state[_TEXT_KEY] += 1
+                    st.rerun()
+            if ingest_text:
+                name = text_name.strip() or "Pasted text"
+                with st.spinner("Processing…"):
+                    try:
+                        n = pipeline.ingest(text_content, source_type="text", source_name=name)
+                        st.success(f"Stored {n} chunks")
+                        st.session_state[_TEXT_KEY] += 1
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Ingestion failed: {exc}")
+
+        st.divider()
+
         # ── Retrieval settings ────────────────────────────────────────
         st.subheader("⚙️ Retrieval")
         st.toggle(
@@ -146,5 +192,29 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
                 "Uses a cross-encoder to re-score retrieved chunks before generating "
                 "an answer. More accurate for follow-up and ambiguous questions, "
                 "but adds ~1–3 s latency. Runs locally — no extra API calls."
+            ),
+        )
+        st.slider(
+            "Top K chunks",
+            min_value=3,
+            max_value=15,
+            value=TOP_K,
+            key="top_k",
+            help=(
+                "Total number of chunks retrieved per query. "
+                "Higher values give the LLM more context and tend to produce longer, "
+                "more complete answers, at the cost of slightly more API tokens."
+            ),
+        )
+        st.slider(
+            "Max per source",
+            min_value=1,
+            max_value=5,
+            value=MAX_CHUNKS_PER_SOURCE,
+            key="max_chunks_per_source",
+            help=(
+                "Maximum chunks retrieved from any single source. "
+                "Lower values force the answer to draw from more sources; "
+                "higher values allow deeper focus on one source."
             ),
         )

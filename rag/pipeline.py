@@ -1,8 +1,10 @@
+from config.settings import MAX_CHUNKS_PER_SOURCE, TOP_K
 from rag.chunking.chunker import Chunker
 from rag.embeddings.embedder import Embedder
 from rag.generation.generator import Generator
 from rag.ingestion.arxiv_ingestor import ArXivIngestor
 from rag.ingestion.pdf_ingestor import PDFIngestor
+from rag.ingestion.text_ingestor import TextIngestor
 from rag.ingestion.web_ingestor import WebIngestor
 from rag.ingestion.youtube_ingestor import YouTubeIngestor
 from rag.memory.conversation import ConversationMemory
@@ -30,6 +32,7 @@ class RAGPipeline:
         self._web_ingestor = WebIngestor()
         self._yt_ingestor = YouTubeIngestor()
         self._arxiv_ingestor = ArXivIngestor()
+        self._text_ingestor = TextIngestor()
         self._retriever = Retriever(self._embedder, self._store)
         self._generator: Generator | None = None  # lazy: avoids startup failure without GWDG creds
         self._memory = ConversationMemory()
@@ -57,6 +60,8 @@ class RAGPipeline:
             docs = self._yt_ingestor.ingest(source, source_name)
         elif source_type == "arxiv":
             docs = self._arxiv_ingestor.ingest(source, source_name)
+        elif source_type == "text":
+            docs = self._text_ingestor.ingest(source, source_name)
         else:
             raise ValueError(f"Unknown source type: '{source_type}'")
 
@@ -90,9 +95,17 @@ class RAGPipeline:
         """
         return self._memory.rewrite_query(query, history) if history else query
 
-    def retrieve(self, query: str, rerank: bool = False) -> list:
+    def retrieve(
+        self,
+        query: str,
+        rerank: bool = False,
+        top_k: int = TOP_K,
+        max_chunks_per_source: int = MAX_CHUNKS_PER_SOURCE,
+    ) -> list:
         """Embed *query* and return the top-k most relevant Document objects."""
-        results = self._retriever.retrieve(query, rerank=rerank)
+        results = self._retriever.retrieve(
+            query, top_k=top_k, rerank=rerank, max_chunks_per_source=max_chunks_per_source
+        )
         return [doc for doc, _ in results]
 
     def generate(

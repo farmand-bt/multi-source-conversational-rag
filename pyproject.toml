@@ -18,8 +18,10 @@ dependencies = [
     "trafilatura>=1.12",
     "youtube-transcript-api>=0.6",
     "streamlit>=1.39",
+    "streamlit-javascript>=0.1.5",
     "python-dotenv>=1.0",
     "fpdf2>=2.7",
+    "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]

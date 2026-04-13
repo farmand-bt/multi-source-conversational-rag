@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **M2 notes:**
 - `app/config.py` was deleted; page constants live in `app/page_config.py` to avoid shadowing the `config/` settings package (Streamlit prepends `app/` to `sys.path`).
 - Imports inside `app/app.py` that reference other files in `app/` must use **bare names** (`from components.sidebar import ...`, `from page_config import ...`), NOT package-qualified names (`from app.components...`). Streamlit adds `app/` to `sys.path[0]`, causing `app.py` itself to be seen as module `app` (a module, not a package), which makes `from app.components` fail. This is intentional — `app/app.py` is only ever launched via `streamlit run`.
-- `RAGPipeline` is a `@st.cache_resource` singleton — one instance per server process so the sentence-transformer model loads once.
+- **Per-user session isolation:** `Embedder` is `@st.cache_resource` (shared across users — no state). `RAGPipeline` is created per-session in `st.session_state` with `ephemeral=True`, which creates an in-memory `chromadb.EphemeralClient()` — data is fully isolated between users and lost on page refresh. Do NOT cache the pipeline as `@st.cache_resource` (would share ingested sources across all users).
 - `ChromaStore` receives pre-computed embeddings from `Embedder` (embedding path) — `Embedder` is the single embedding authority; ChromaDB has no internal embedding function.
 - Metadata `None` values are stripped before passing to ChromaDB (ChromaDB rejects `None` metadata values).
 
@@ -51,7 +51,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **arXiv ingestion:** `rag/ingestion/arxiv_ingestor.py` parses an arXiv ID from a bare ID (`2305.14283`) or any arXiv URL, fetches the paper title from the arXiv Atom API (`export.arxiv.org/api/query`), downloads the PDF via `requests`, and delegates extraction to `PDFIngestor`. Returned Documents have `source_type="pdf"` and `source_name=<paper title>` (falls back to `"arXiv:<id>"` if the API is unreachable). No API key required. Pipeline routes `source_type="arxiv"` to `ArXivIngestor`. Sidebar has a dedicated 📜 arXiv section with the same counter-key clear pattern as Web/YouTube.
 - **PDF export:** `app/components/chat.py` exposes a `📥 Export` download button (visible when messages exist) that calls `_export_chat_pdf()`. Uses `fpdf2` (lazy import inside the function). Common non-latin-1 characters (em-dash, smart quotes, ellipsis) are replaced with ASCII equivalents before encoding; long unbreakable tokens are split at 55 chars. **Critical:** all `multi_cell()` calls must pass `new_x=XPos.LMARGIN, new_y=YPos.NEXT` — fpdf2 2.7+ changed the default to `new_x=XPos.RIGHT`, which leaves the cursor at the right edge and causes the next `multi_cell(0, ...)` to compute available width ≈ 0, raising `FPDFException: Not enough horizontal space`. Inline `[N]` citation markers are preserved in the PDF text. Citation locations (URLs) are replaced with `(link)` since PDFs are not interactive.
 - **`fpdf2>=2.7`** added to `pyproject.toml` dependencies and `requirements.txt` (regenerated via `uv export`).
-- **YouTube ingestion on Streamlit Cloud:** YouTube actively blocks transcript requests from cloud provider IP ranges (AWS/GCP). This is a platform-level restriction — no code fix is possible. The sidebar shows a clear error message when this is detected (keywords: "too many", "429", "blocked", "ip"). YouTube ingestion works normally on a locally-hosted instance.
+- **YouTube ingestion on Streamlit Cloud:** YouTube actively blocks transcript requests from cloud provider IP ranges (AWS/GCP). This is a platform-level restriction — no code fix is possible. The sidebar error message directs users to the **Paste Text** section as a workaround. YouTube ingestion works normally on a locally-hosted instance.
+- **Plain text ingestor:** `rag/ingestion/text_ingestor.py` accepts a raw string, returns a single `Document` with `source_type="text"`, `source_id` = first 16 hex chars of SHA-256 of the content. The Chunker splits it downstream. Citation format: `[Text: source name]` (no location field). Regex in `rag/models.py` updated to include "Text". Generator prompt updated. `source_viewer.py` uses "📝" icon. Sidebar section "📝 Paste Text" uses the counter-key clear pattern with both a `text_input` (name) and `text_area` (content).
+- **Retrieval parameter sliders:** "Top K chunks" (3–15, default `TOP_K`) and "Max per source" (1–5, default `MAX_CHUNKS_PER_SOURCE`) sliders in the sidebar "⚙️ Retrieval" section. Stored in `st.session_state["top_k"]` and `st.session_state["max_chunks_per_source"]`. `Retriever.retrieve()` and `pipeline.retrieve()` both accept `top_k` and `max_chunks_per_source` keyword args; `_run_pipeline()` in `chat.py` reads them from session state. Changing these at query time does NOT require re-ingestion.
+- **Browser timezone detection:** `app/app.py` calls `_detect_timezone()` on every render via `streamlit-javascript`. `st_javascript("Intl.DateTimeFormat().resolvedOptions().timeZone")` returns `0` on the first render (component initialising) then the IANA timezone string on subsequent renders (auto-triggered rerun). Result cached as `st.session_state.user_tz` (string or `None` for UTC fallback). `source_viewer.py` converts the stored UTC `ingested_at` timestamps using `zoneinfo.ZoneInfo(tz_name)` — showing local time when available, "YYYY-MM-DD HH:MM UTC" as fallback. `tzdata>=2024.1` added to deps for Windows compatibility.
+- **Rate limiting:** `MAX_QUESTIONS_PER_SESSION = 10` in `config/settings.py` (0 = unlimited). Tracked via `st.session_state.question_count`. Chat input is disabled and a warning shown when the limit is reached.
 
 The authoritative milestone plan is `multi-source-rag-project-plan-prompt1.md`.
 
@@ -80,15 +84,15 @@ uv run python scripts/reset_vectorstore.py
 
 A conversational RAG assistant that ingests documents from multiple sources, embeds them into a local ChromaDB vector store, and supports multi-turn Q&A with citations via a Streamlit UI.
 
-**Tech stack:** Python 3.10+, LangChain, sentence-transformers (`all-MiniLM-L6-v2`, 384-dim), ChromaDB (local), GWDG API (OpenAI-compatible LLM), PyMuPDF, trafilatura, youtube-transcript-api, fpdf2, Streamlit, Ruff.
+**Tech stack:** Python 3.10+, LangChain, sentence-transformers (`all-MiniLM-L6-v2`, 384-dim), ChromaDB (ephemeral in-memory per session), any OpenAI-compatible LLM API, PyMuPDF, trafilatura, youtube-transcript-api, fpdf2, streamlit-javascript, tzdata, Streamlit, Ruff.
 
 ### Data flow
 
 **Write path (fully built):**
-1. User submits a PDF, arXiv ID/URL, web URL, or YouTube URL via the Streamlit sidebar.
-2. The matching ingestor extracts text (`PDFIngestor`/`ArXivIngestor` → one Document per page; `WebIngestor` → one Document; `YouTubeIngestor` → timestamp-grouped Documents).
+1. User submits a PDF, arXiv ID/URL, web URL, YouTube URL, or pasted text via the Streamlit sidebar.
+2. The matching ingestor extracts text (`PDFIngestor`/`ArXivIngestor` → one Document per page; `WebIngestor`/`TextIngestor` → one Document; `YouTubeIngestor` → timestamp-grouped Documents).
 3. `Chunker` splits into chunks (`chunk_size=500`, `chunk_overlap=50`) with globally sequential `chunk_index`.
-4. `Embedder` produces 384-dim vectors; `ChromaStore` upserts chunks + embeddings into ChromaDB (`./data/chroma`).
+4. `Embedder` produces 384-dim vectors; `ChromaStore` upserts chunks + embeddings into the session's ephemeral in-memory ChromaDB.
 
 **Read path (fully built):**
 5. User types a query; if there is prior history, `ConversationMemory.rewrite_query()` reformulates it as a standalone question (one LLM call).
@@ -107,6 +111,6 @@ A conversational RAG assistant that ingests documents from multiple sources, emb
 
 - **Ingestor base class must exist from Milestone 1**, even before web/YouTube sources are built. The full metadata schema (`source_type`, `source_name`, `source_id`, `page_number`/`url`/`timestamp`, `chunk_index`, `ingested_at`) must also be consistent across all ingestors from day one — the citation rendering contract in the generator prompt depends on it.
 - **LLM is called only for answer generation and query rewriting** — not for embedding, chunking, or retrieval. Re-ranking uses a local cross-encoder (no API). Embeddings are cached via Chroma's persistence to conserve the limited GWDG API quota.
-- **Citation contract:** the generator prompt instructs the LLM to produce type-prefixed citations: `[PDF: name, page N]` / `[Web: title, URL]` / `[YouTube: title, timestamped_URL]`. The regex in `rag/models.py` parses these; `app/components/chat.py` replaces them with numbered `[1]`, `[2]` references. Do not change the format without updating both the generator prompt and the regex.
+- **Citation contract:** the generator prompt instructs the LLM to produce type-prefixed citations: `[PDF: name, page N]` / `[Web: title, URL]` / `[YouTube: title, timestamped_URL]` / `[Text: name]`. The regex in `rag/models.py` matches `(PDF|Web|YouTube|Text)`; `app/components/chat.py` replaces them with numbered `[1]`, `[2]` references. Do not change the format without updating both the generator prompt and the regex.
 - **YouTube special case:** transcripts should be chunked by timestamp-boundary segments when possible, not just by character count.
 - **Local-first:** no Docker, no external vector DB — ChromaDB is file-persisted, optimized for Streamlit Cloud deployment.

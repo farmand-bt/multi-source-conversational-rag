@@ -10,6 +10,7 @@ _SYSTEM_PROMPT = (
     "  • PDF sources:     [PDF: filename.pdf, page N]\n"
     "  • Web pages:       [Web: page title, URL]\n"
     "  • YouTube videos:  [YouTube: video title, URL] — copy the URL from the context header\n"
+    "  • Plain text:      [Text: source name]\n"
     "Match the citation type to the source type shown in the context header.\n"
     "If the context does not contain enough information to answer, say so clearly."
 )
@@ -69,6 +70,8 @@ class Generator:
                 ts_url = f"{doc.url}&t={_ts_to_seconds(ts)}s"
                 return f"[YouTube: {doc.source_name}, {ts_url}]"
             return f"[YouTube: {doc.source_name}, {ts}]"
+        if doc.source_type == "text":
+            return f"[Text: {doc.source_name}]"
         # web
         url = doc.url or doc.source_name
         return f"[Web: {doc.source_name}, {url}]"

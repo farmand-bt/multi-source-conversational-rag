@@ -1,10 +1,28 @@
+from datetime import datetime
+from datetime import timezone as dt_tz
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import streamlit as st
 
 from rag.pipeline import RAGPipeline
 
-_ICONS = {"pdf": "📄", "web": "🌐", "youtube": "▶️"}
+_ICONS = {"pdf": "📄", "web": "🌐", "youtube": "▶️", "text": "📝"}
+
+
+def _format_ingested(utc_iso: str) -> str:
+    """Convert a UTC ISO timestamp to the user's local time (or UTC as fallback)."""
+    tz_name: str | None = st.session_state.get("user_tz")
+    try:
+        dt = datetime.fromisoformat(utc_iso)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=dt_tz.utc)
+        if tz_name:
+            dt = dt.astimezone(ZoneInfo(tz_name))
+            return dt.strftime("%Y-%m-%d %H:%M")
+        return dt.strftime("%Y-%m-%d %H:%M") + " UTC"
+    except (ValueError, ZoneInfoNotFoundError):
+        return utc_iso[:19].replace("T", " ") + " UTC"
 
 
 def render_source_viewer(pipeline: RAGPipeline) -> None:
@@ -56,7 +74,7 @@ def render_source_viewer(pipeline: RAGPipeline) -> None:
                 st.write(f"**Video:** {source['url']}")
 
             if source.get("ingested_at"):
-                st.write(f"**Ingested:** {source['ingested_at'][:19].replace('T', ' ')} UTC")
+                st.write(f"**Ingested:** {_format_ingested(source['ingested_at'])}")
 
             if st.button("Delete", key=f"del_{source['source_id']}", type="secondary"):
                 pipeline.delete_source(source["source_id"])

@@ -493,6 +493,10 @@ sqlalchemy==2.0.49
     #   langchain-classic
     #   langchain-community
 streamlit==1.56.0
+    # via
+    #   multi-source-conversational-rag
+    #   streamlit-javascript
+streamlit-javascript==0.1.5
     # via multi-source-conversational-rag
 sympy==1.14.0
     # via
@@ -573,8 +577,9 @@ typing-inspection==0.4.2
     # via
     #   pydantic
     #   pydantic-settings
-tzdata==2026.1 ; python_full_version < '3.11' or sys_platform == 'emscripten' or sys_platform == 'win32'
+tzdata==2026.1
     # via
+    #   multi-source-conversational-rag
     #   pandas
     #   tzlocal
 tzlocal==5.3.1

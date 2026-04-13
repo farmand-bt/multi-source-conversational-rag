@@ -3,6 +3,7 @@ from components.chat import render_chat
 from components.sidebar import render_sidebar
 from components.source_viewer import render_source_viewer
 from page_config import LAYOUT, PAGE_ICON, PAGE_TITLE, SIDEBAR_STATE
+from streamlit_javascript import st_javascript
 
 from rag.embeddings.embedder import Embedder
 from rag.pipeline import RAGPipeline
@@ -36,7 +37,22 @@ def _get_pipeline() -> RAGPipeline:
     return st.session_state.pipeline
 
 
+def _detect_timezone() -> None:
+    """Detect the user's browser timezone (IANA name) and cache it in session state.
+
+    st_javascript returns 0 on the first render while the component initialises,
+    then triggers a rerun that delivers the actual string value.  We update
+    session_state on every render so the value is refreshed if the tab is reused.
+    """
+    tz = st_javascript("Intl.DateTimeFormat().resolvedOptions().timeZone")
+    if isinstance(tz, str) and tz:
+        st.session_state.user_tz = tz
+    elif "user_tz" not in st.session_state:
+        st.session_state.user_tz = None  # fallback: display UTC
+
+
 def main() -> None:
+    _detect_timezone()
     pipeline = _get_pipeline()
 
     st.title(f"{PAGE_ICON} {PAGE_TITLE}")

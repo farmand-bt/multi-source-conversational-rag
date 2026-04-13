@@ -1,9 +1,9 @@
 import re
 from dataclasses import dataclass
 
-# Matches [PDF: name, location], [Web: name, url], [YouTube: name, MM:SS]
+# Matches [PDF: name, location], [Web: name, url], [YouTube: name, MM:SS], [Text: name]
 # Location is optional — the third group may be empty if the LLM omits it.
-_CITATION_RE = re.compile(r"\[(PDF|Web|YouTube):\s*([^,\]]+?)(?:\s*,\s*([^\]]+?))?\s*\]")
+_CITATION_RE = re.compile(r"\[(PDF|Web|YouTube|Text):\s*([^,\]]+?)(?:\s*,\s*([^\]]+?))?\s*\]")
 
 
 @dataclass(frozen=True)

@@ -20,25 +20,30 @@ class Retriever:
         self._cross_encoder = None  # lazy-loaded on first rerank call
 
     def retrieve(
-        self, query: str, top_k: int = TOP_K, rerank: bool = False
+        self,
+        query: str,
+        top_k: int = TOP_K,
+        rerank: bool = False,
+        max_chunks_per_source: int = MAX_CHUNKS_PER_SOURCE,
     ) -> list[tuple[Document, float]]:
         """Return up to top_k (Document, similarity_score) pairs, ordered by score.
 
-        At most MAX_CHUNKS_PER_SOURCE chunks are returned from any single source,
+        At most max_chunks_per_source chunks are returned from any single source,
         ensuring multiple ingested sources can contribute to the context.
         Returns an empty list if the query is blank or the store is empty.
 
         Args:
-            query:   The (possibly rewritten) search query.
-            top_k:   Maximum number of results to return.
-            rerank:  If True, re-score the candidate pool with a cross-encoder
-                     before applying the per-source cap. More accurate but slower.
+            query:                 The (possibly rewritten) search query.
+            top_k:                 Maximum number of results to return.
+            rerank:                If True, re-score the candidate pool with a cross-encoder
+                                   before applying the per-source cap. More accurate but slower.
+            max_chunks_per_source: Cap on chunks from any single source (diversity control).
         """
         if not query.strip():
             return []
         embedding = self._embedder.embed_query(query)
         # Fetch a larger pool so the per-source cap still yields top_k results
-        candidates = self._store.query(embedding, top_k * MAX_CHUNKS_PER_SOURCE)
+        candidates = self._store.query(embedding, top_k * max_chunks_per_source)
 
         if rerank and candidates:
             candidates = self._rerank(query, candidates)
@@ -47,7 +52,7 @@ class Retriever:
         result: list[tuple[Document, float]] = []
         for doc, score in candidates:
             count = seen.get(doc.source_id, 0)
-            if count < MAX_CHUNKS_PER_SOURCE:
+            if count < max_chunks_per_source:
                 result.append((doc, score))
                 seen[doc.source_id] = count + 1
             if len(result) >= top_k:
