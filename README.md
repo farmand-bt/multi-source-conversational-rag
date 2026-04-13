@@ -2,7 +2,37 @@
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://multi-source-conversational-rag.streamlit.app/)
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit" />
+  <img src="https://img.shields.io/badge/LangChain-LLM_Integration-1C3C3C?logoColor=white" alt="LangChain" />
+  <img src="https://img.shields.io/badge/HuggingFace-Embeddings_%26_Reranking-FFD21E?logo=huggingface&logoColor=black" alt="HuggingFace" />
+  <img src="https://img.shields.io/badge/ChromaDB-Vector_Store-FF6719?logoColor=white" alt="ChromaDB" />
+  <img src="https://img.shields.io/badge/PyMuPDF-PDF_Parsing-00A4EF?logoColor=white" alt="PyMuPDF" />
+  <img src="https://img.shields.io/badge/trafilatura-Web_Extraction-4CAF50?logoColor=white" alt="trafilatura" />
+  <img src="https://img.shields.io/badge/YouTube-Transcripts-FF0000?logo=youtube&logoColor=white" alt="YouTube" />
+  <img src="https://img.shields.io/badge/arXiv-Paper_Ingestion-B31B1B?logoColor=white" alt="arXiv" />
+  <img src="https://img.shields.io/badge/uv-Package_Manager-DE5FE9?logoColor=white" alt="uv" />
+  <img src="https://img.shields.io/badge/pytest-80_Tests-0A9EDC?logo=pytest&logoColor=white" alt="pytest" />
+  <img src="https://img.shields.io/badge/Ruff-Linting-D7FF64?logoColor=black" alt="Ruff" />
+</p>
+
 A conversational AI assistant that lets you ingest documents from **PDFs, arXiv papers, web pages, and YouTube videos**, then ask natural-language questions with multi-turn memory and source citations — all running locally with no external vector database.
+
+---
+
+## Table of Contents
+
+- [Demo](#demo)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Development](#development)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [Possible Future Improvements](#possible-future-improvements)
+- [License](#license)
+- [Author](#author)
 
 ---
 
@@ -10,7 +40,18 @@ A conversational AI assistant that lets you ingest documents from **PDFs, arXiv 
 
 ![Demo](assets/demo.gif)
 
-The demo shows three sources being ingested: a PDF of the paper [*"Query Rewriting for Retrieval-Augmented Large Language Models"* (Ma et al., 2023)](https://arxiv.org/abs/2305.14283), an [AWS web article on RAG](https://aws.amazon.com/what-is/retrieval-augmented-generation/), and an [IBM YouTube video explaining RAG](https://www.youtube.com/watch?v=qppV3n3YlF8). Re-ranking is enabled, and two questions are asked — the second is a follow-up that triggers automatic query rewriting. The rewritten query and per-source citations are visible in the UI.
+The demo walks through the full pipeline end-to-end:
+
+1. **Ingest three sources** from the sidebar:
+   - 📄 **PDF** — [*"Query Rewriting for Retrieval-Augmented Large Language Models"* (Ma et al., 2023)](https://arxiv.org/abs/2305.14283)
+   - 🌐 **Web page** — [AWS article on Retrieval-Augmented Generation](https://aws.amazon.com/what-is/retrieval-augmented-generation/)
+   - ▶️ **YouTube video** — [IBM explainer on RAG](https://www.youtube.com/watch?v=qppV3n3YlF8)
+
+2. **Enable re-ranking** in the sidebar — a local cross-encoder re-scores retrieved chunks for higher accuracy (no API needed).
+
+3. **Ask a direct question** — the app retrieves the most relevant chunks, generates an answer, and shows numbered inline citations `[1]`, `[2]` linked back to their sources.
+
+4. **Ask a follow-up question** — the app automatically rewrites the ambiguous query into a standalone question using conversation history. The rewritten query is visible in a collapsible expander below the answer.
 
 ---
 
@@ -49,12 +90,12 @@ flowchart TD
         I --> J[Retriever\ntop-k chunks]
         J -- opt-in --> K[Cross-encoder\nre-rank]
         K --> L
-        J --> L[LLM Generator\nGWDG API]
+        J --> L[LLM Generator\nOpenAI-compatible API]
         L --> M[Answer + citations]
     end
 
     F --> J
-    
+
     %% Give the edge an id to style it
     linkStyle 14 stroke:green,stroke-width:2px
 ```
@@ -70,9 +111,9 @@ flowchart TD
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - [uv](https://docs.astral.sh/uv/) — `pip install uv`
-- A GWDG API key (or any OpenAI-compatible endpoint)
+- An API key for any **OpenAI-compatible LLM endpoint** (see environment variables below)
 
 ### Installation
 
@@ -89,13 +130,15 @@ make run                      # launches the Streamlit app at http://localhost:8
 
 ### Environment variables
 
+The app connects to **any OpenAI-compatible LLM API** — you are not locked into a specific provider. The environment variable names use the `GWDG_` prefix because [GWDG](https://www.gwdg.de/) is the provider used during development (it offers free API access to students at universities in Niedersachsen, Germany), but the values work with any compatible endpoint such as OpenAI, Together AI, Groq, or a self-hosted model.
+
 Copy `.env.example` to `.env` and fill in:
 
 | Variable | Required | Description |
 |---|---|---|
-| `GWDG_API_KEY` | ✅ | API key for the GWDG (or any OpenAI-compatible) LLM endpoint |
-| `GWDG_API_BASE` | ✅ | Base URL, e.g. `https://chat-ai.academiccloud.de/v1` |
-| `GWDG_MODEL_NAME` | ✅ | Model name, e.g. `meta-llama-3.1-70b-instruct` |
+| `GWDG_API_KEY` | ✅ | Your LLM API key |
+| `GWDG_API_BASE` | ✅ | Base URL of your provider, e.g. `https://chat-ai.academiccloud.de/v1` (GWDG) or `https://api.openai.com/v1` (OpenAI) |
+| `GWDG_MODEL_NAME` | ✅ | Model name to request, e.g. `meta-llama-3.1-70b-instruct` (GWDG) or `gpt-4o` (OpenAI) |
 | `HF_TOKEN` | ☑️ optional | HuggingFace token — only needed to access gated models. The embedding and re-ranking models used here are public, so this can be left empty. |
 | `HF_HUB_DISABLE_SYMLINKS_WARNING` | ☑️ optional | Set to `1` on Windows to suppress a cosmetic HuggingFace cache warning (no functional impact). |
 
@@ -134,7 +177,7 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 │   ├── embeddings/embedder.py  # sentence-transformers bi-encoder
 │   ├── vectorstore/chroma_store.py
 │   ├── retrieval/retriever.py  # top-k + per-source cap + optional cross-encoder rerank
-│   ├── generation/generator.py # LangChain → GWDG LLM, citation prompt
+│   ├── generation/generator.py # LangChain → OpenAI-compatible LLM, citation prompt
 │   ├── memory/conversation.py  # query rewriting with conversation history
 │   ├── models.py               # Citation + Answer dataclasses, citation regex
 │   └── pipeline.py             # orchestrator — exposes ingest / ask / granular steps
@@ -155,7 +198,7 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 | Layer | Library |
 |---|---|
 | UI | Streamlit 1.39+ |
-| LLM integration | LangChain + langchain-openai |
+| LLM integration | LangChain + langchain-openai (any OpenAI-compatible endpoint) |
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-dim) |
 | Re-ranking | sentence-transformers `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | Vector store | ChromaDB (local, file-persisted) |
