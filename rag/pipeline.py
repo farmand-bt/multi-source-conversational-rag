@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 from config.settings import MAX_CHUNKS_PER_SOURCE, TOP_K
 from rag.chunking.chunker import Chunker
 from rag.embeddings.embedder import Embedder
@@ -128,6 +130,21 @@ class RAGPipeline:
             return Answer(text="I don't have enough information to answer that question.")
         raw = self._get_generator().generate(query, docs, history)
         return Answer.from_raw(raw, rewritten_query=rewritten_query)
+
+    def stream_generate(
+        self,
+        query: str,
+        docs: list,
+        history: list[dict] | None = None,
+    ) -> Iterator[str]:
+        """Yield LLM response tokens one at a time.
+
+        Yields a single fallback string immediately when *docs* is empty.
+        """
+        if not docs:
+            yield "I don't have enough information to answer that question."
+            return
+        yield from self._get_generator().stream(query, docs, history)
 
     # ------------------------------------------------------------------
     # High-level convenience (used by tests and non-UI callers)

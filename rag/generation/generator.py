@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
@@ -49,6 +51,28 @@ class Generator:
         messages.append(HumanMessage(content=_USER_TEMPLATE.format(context=context, query=query)))
         response = self._llm.invoke(messages)
         return response.content
+
+    def stream(
+        self,
+        query: str,
+        context_docs: list[Document],
+        history: list[dict] | None = None,
+    ) -> Iterator[str]:
+        """Yield response tokens one at a time via the LLM streaming API."""
+        context = self._build_context(context_docs)
+        messages: list = [SystemMessage(content=_SYSTEM_PROMPT)]
+
+        for turn in history or []:
+            role = turn.get("role", "")
+            content = turn.get("content", "")
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                messages.append(AIMessage(content=content))
+
+        messages.append(HumanMessage(content=_USER_TEMPLATE.format(context=context, query=query)))
+        for chunk in self._llm.stream(messages):
+            yield chunk.content
 
     def _build_context(self, docs: list[Document]) -> str:
         parts = []

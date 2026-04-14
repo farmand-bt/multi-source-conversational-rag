@@ -129,7 +129,7 @@ def render_chat(pipeline: RAGPipeline) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Pipeline runner with live sequential step display
+# Pipeline runner — hybrid streaming approach
 # ---------------------------------------------------------------------------
 
 
@@ -141,20 +141,21 @@ def _run_pipeline(
     top_k: int = TOP_K,
     max_chunks_per_source: int = MAX_CHUNKS_PER_SOURCE,
 ) -> Answer:
-    """Execute rewrite → retrieve → generate with a live step-by-step progress card.
+    """Execute rewrite → retrieve → stream-generate.
 
-    Each step updates an st.empty() placeholder immediately, guaranteeing
-    that steps appear sequentially in the UI as they complete.
+    The progress card covers the fast Rewrite and Retrieve steps.
+    Once retrieval completes the card is cleared and the LLM response
+    streams directly into an assistant chat bubble word-by-word.
     """
     has_history = bool(history)
     retrieve_label = "Retrieve & Re-rank" if rerank else "Retrieve"
 
-    # Build the ordered step list (Rewrite only shown when there is history)
+    # Generate is intentionally omitted from the card — the streaming
+    # output itself serves as the visual indicator for that step.
     steps: list[dict] = []
     if has_history:
         steps.append({"emoji": "✏️", "label": "Rewrite", "state": "pending", "detail": ""})
     steps.append({"emoji": "🔍", "label": retrieve_label, "state": "pending", "detail": ""})
-    steps.append({"emoji": "🤖", "label": "Generate", "state": "pending", "detail": ""})
 
     box = st.empty()
 
@@ -189,28 +190,119 @@ def _run_pipeline(
     steps[retrieve_idx]["detail"] = f"{n} chunk{'s' if n != 1 else ''} found"
     _render()
 
-    # ── Step: Generate ────────────────────────────────────────────────
-    generate_idx = retrieve_idx + 1
     if not docs:
         box.empty()
         return Answer(text="I don't have enough information to answer that question.")
 
-    steps[generate_idx]["state"] = "active"
-    _render()
+    box.empty()  # progress card cleared — streaming begins immediately
+
+    # ── Step: Generate (streaming) ────────────────────────────────────
     rewritten_for_display = rewritten if rewritten != prompt else ""
-    try:
-        answer = pipeline.generate(prompt, docs, history, rewritten_query=rewritten_for_display)
-    except Exception as exc:
-        steps[generate_idx]["detail"] = "Error"
-        _render()
-        box.empty()
-        return Answer(text=f"⚠️ {_llm_error_message(exc)}")
+    with st.chat_message("assistant"):
+        stream_placeholder = st.empty()
+        full_text = ""
+        try:
+            for token in pipeline.stream_generate(prompt, docs, history):
+                full_text += token
+                stream_placeholder.markdown(full_text + "▌", unsafe_allow_html=True)
+        except Exception as exc:
+            return Answer(text=f"⚠️ {_llm_error_message(exc)}")
 
-    steps[generate_idx]["state"] = "done"
-    _render()
+        # Swap raw citation markers for numbered, coloured references
+        answer = Answer.from_raw(full_text, rewritten_query=rewritten_for_display)
+        clean_text, numbered = _number_citations(answer)
+        stream_placeholder.markdown(_colorize_refs(clean_text), unsafe_allow_html=True)
+        if answer.rewritten_query:
+            with st.expander("🔍 Query rewritten as", expanded=False):
+                st.caption(answer.rewritten_query)
+        _render_sources(numbered)
 
-    box.empty()  # remove the progress card once the answer is ready
     return answer
+
+
+# ---------------------------------------------------------------------------
+# Non-streaming pipeline runner (kept for reference)
+# To switch back: replace the _run_pipeline body above with this one.
+# ---------------------------------------------------------------------------
+#
+# def _run_pipeline(
+#     pipeline: RAGPipeline,
+#     prompt: str,
+#     history: list[dict],
+#     rerank: bool,
+#     top_k: int = TOP_K,
+#     max_chunks_per_source: int = MAX_CHUNKS_PER_SOURCE,
+# ) -> Answer:
+#     """Execute rewrite → retrieve → generate with a live step-by-step progress card.
+#
+#     Each step updates an st.empty() placeholder immediately, guaranteeing
+#     that steps appear sequentially in the UI as they complete.
+#     """
+#     has_history = bool(history)
+#     retrieve_label = "Retrieve & Re-rank" if rerank else "Retrieve"
+#
+#     # Build the ordered step list (Rewrite only shown when there is history)
+#     steps: list[dict] = []
+#     if has_history:
+#         steps.append({"emoji": "✏️", "label": "Rewrite", "state": "pending", "detail": ""})
+#     steps.append({"emoji": "🔍", "label": retrieve_label, "state": "pending", "detail": ""})
+#     steps.append({"emoji": "🤖", "label": "Generate", "state": "pending", "detail": ""})
+#
+#     box = st.empty()
+#
+#     def _render() -> None:
+#         box.markdown(_pipeline_card(steps), unsafe_allow_html=True)
+#
+#     _render()
+#
+#     # ── Step: Rewrite ─────────────────────────────────────────────────
+#     rewritten = prompt
+#     if has_history:
+#         steps[0]["state"] = "active"
+#         _render()
+#         rewritten = pipeline.rewrite_query(prompt, history)
+#         steps[0]["state"] = "done"
+#         if rewritten != prompt:
+#             short = rewritten if len(rewritten) <= 60 else rewritten[:57] + "…"
+#             steps[0]["detail"] = f'"{short}"'
+#         else:
+#             steps[0]["detail"] = "No change"
+#         _render()
+#
+#     # ── Step: Retrieve ────────────────────────────────────────────────
+#     retrieve_idx = 1 if has_history else 0
+#     steps[retrieve_idx]["state"] = "active"
+#     _render()
+#     docs = pipeline.retrieve(
+#         rewritten, rerank=rerank, top_k=top_k, max_chunks_per_source=max_chunks_per_source
+#     )
+#     steps[retrieve_idx]["state"] = "done"
+#     n = len(docs)
+#     steps[retrieve_idx]["detail"] = f"{n} chunk{'s' if n != 1 else ''} found"
+#     _render()
+#
+#     # ── Step: Generate ────────────────────────────────────────────────
+#     generate_idx = retrieve_idx + 1
+#     if not docs:
+#         box.empty()
+#         return Answer(text="I don't have enough information to answer that question.")
+#
+#     steps[generate_idx]["state"] = "active"
+#     _render()
+#     rewritten_for_display = rewritten if rewritten != prompt else ""
+#     try:
+#         answer = pipeline.generate(prompt, docs, history, rewritten_query=rewritten_for_display)
+#     except Exception as exc:
+#         steps[generate_idx]["detail"] = "Error"
+#         _render()
+#         box.empty()
+#         return Answer(text=f"⚠️ {_llm_error_message(exc)}")
+#
+#     steps[generate_idx]["state"] = "done"
+#     _render()
+#
+#     box.empty()  # remove the progress card once the answer is ready
+#     return answer
 
 
 def _llm_error_message(exc: Exception) -> str:
