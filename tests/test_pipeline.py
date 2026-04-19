@@ -113,7 +113,7 @@ def test_ask_uses_rewritten_query_for_retrieval(tmp_path, embedder):
     retrieved_queries = []
 
     class _CapturingRetriever:
-        def retrieve(self, query, top_k=5, rerank=False):
+        def retrieve(self, query, top_k=5, rerank=False, max_chunks_per_source=3):
             retrieved_queries.append(query)
             return []
 
@@ -139,7 +139,7 @@ def test_ask_no_history_skips_rewriting(tmp_path, embedder):
     retrieved_queries = []
 
     class _CapturingRetriever:
-        def retrieve(self, query, top_k=5, rerank=False):
+        def retrieve(self, query, top_k=5, rerank=False, max_chunks_per_source=3):
             retrieved_queries.append(query)
             return []
 

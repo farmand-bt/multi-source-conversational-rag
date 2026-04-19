@@ -16,31 +16,31 @@ class PDFIngestor(Ingestor):
             source_name: Human-readable name; inferred from path if not given.
         """
         if isinstance(source, bytes):
-            pdf = fitz.open(stream=source, filetype="pdf")
             name = source_name or "document.pdf"
             source_id = hashlib.sha256(source).hexdigest()[:16]
+            pdf_context = fitz.open(stream=source, filetype="pdf")
         else:
-            pdf = fitz.open(source)
             name = source_name or Path(source).name
             source_id = hashlib.sha256(Path(source).read_bytes()).hexdigest()[:16]
+            pdf_context = fitz.open(source)
 
         documents = []
-        for page_idx in range(len(pdf)):
-            text = pdf[page_idx].get_text().strip()
-            if not text:
-                continue
-            documents.append(
-                Document(
-                    text=text,
-                    source_type="pdf",
-                    source_name=name,
-                    source_id=source_id,
-                    chunk_index=0,  # re-assigned by Chunker
-                    page_number=page_idx + 1,
+        with pdf_context as pdf:
+            for page_idx in range(len(pdf)):
+                text = pdf[page_idx].get_text().strip()
+                if not text:
+                    continue
+                documents.append(
+                    Document(
+                        text=text,
+                        source_type="pdf",
+                        source_name=name,
+                        source_id=source_id,
+                        chunk_index=0,  # re-assigned by Chunker
+                        page_number=page_idx + 1,
+                    )
                 )
-            )
 
-        pdf.close()
         if not documents:
             raise ValueError(
                 f"No text could be extracted from '{name}'. "

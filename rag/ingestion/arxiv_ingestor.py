@@ -29,12 +29,18 @@ class ArXivIngestor(Ingestor):
         Args:
             source: arXiv URL (abs or pdf) or bare ID, e.g. '2305.14283' or
                     'https://arxiv.org/abs/2305.14283'.
-            source_name: Override the display name; defaults to 'arXiv:<id>'.
+            source_name: Override the display name; defaults to paper title or 'arXiv:<id>'.
         """
         arxiv_id = self._extract_id(source.strip())
         pdf_bytes = self._download(arxiv_id)
         display_name = source_name or _fetch_title(arxiv_id) or f"arXiv:{arxiv_id}"
-        return self._pdf_ingestor.ingest(pdf_bytes, display_name)
+        docs = self._pdf_ingestor.ingest(pdf_bytes, display_name)
+        # Override source_type so the source viewer can show the arXiv icon.
+        # The LLM citation format remains [PDF: ...] because _format_header treats
+        # "arxiv" identically to "pdf".
+        from dataclasses import replace as _replace
+
+        return [_replace(doc, source_type="arxiv") for doc in docs]
 
     # ------------------------------------------------------------------
     # Helpers

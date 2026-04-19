@@ -7,7 +7,7 @@ import streamlit as st
 
 from rag.pipeline import RAGPipeline
 
-_ICONS = {"pdf": "📄", "web": "🌐", "youtube": "▶️", "text": "📝"}
+_ICONS = {"pdf": "📄", "arxiv": "📜", "web": "🌐", "youtube": "▶️", "text": "📝"}
 
 
 def _format_ingested(utc_iso: str) -> str:

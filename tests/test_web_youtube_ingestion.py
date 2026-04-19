@@ -211,6 +211,8 @@ class TestYouTubeIngestor:
 
         mock_transcript = MagicMock()
         mock_transcript.fetch.return_value = [french_snippet]
+        # Make translate raise so the ingestor falls back to first.fetch()
+        mock_transcript.translate.side_effect = Exception("translation not supported")
 
         mock_transcript_list = MagicMock()
         mock_transcript_list.__iter__ = MagicMock(return_value=iter([mock_transcript]))

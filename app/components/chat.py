@@ -8,8 +8,7 @@ from rag.models import _CITATION_RE, Answer
 from rag.pipeline import RAGPipeline
 
 _MAX_HISTORY_TURNS = 10  # user+assistant pairs kept in session state
-_CITE_COLOUR = "#e07b39"  # warm orange for inline citation numbers
-_ORANGE = "#e07b39"
+_ORANGE = "#e07b39"  # warm orange — used for citations and active pipeline steps
 _GREEN = "#198754"
 _GREY = "#adb5bd"
 
@@ -94,10 +93,13 @@ def render_chat(pipeline: RAGPipeline) -> None:
 
     # ── Handle new input ──────────────────────────────────────────────
     if prompt := st.chat_input(placeholder, disabled=not has_sources or limit_reached):
-        # Build history from current messages BEFORE appending the new one
-        history = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages][
-            -_MAX_HISTORY_TURNS * 2 :
-        ]
+        # Build history from current messages BEFORE appending the new one.
+        # Use raw_content for assistant turns so the LLM sees [PDF: name, page N]
+        # citation markers rather than the already-numbered [1], [2] display form.
+        history = [
+            {"role": m["role"], "content": m.get("raw_content", m["content"])}
+            for m in st.session_state.messages
+        ][-_MAX_HISTORY_TURNS * 2 :]
 
         st.session_state.question_count += 1
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -115,7 +117,8 @@ def render_chat(pipeline: RAGPipeline) -> None:
         st.session_state.messages.append(
             {
                 "role": "assistant",
-                "content": clean_text,
+                "content": clean_text,  # numbered [1],[2] — for display
+                "raw_content": answer.text,  # original [PDF: ...] markers — for LLM history
                 "citations": numbered,
                 "rewritten_query": answer.rewritten_query,
             }
@@ -206,6 +209,7 @@ def _run_pipeline(
                 full_text += token
                 stream_placeholder.markdown(full_text + "▌", unsafe_allow_html=True)
         except Exception as exc:
+            stream_placeholder.empty()  # clear any partial streamed content
             return Answer(text=f"⚠️ {_llm_error_message(exc)}")
 
         # Swap raw citation markers for numbered, coloured references
@@ -400,10 +404,11 @@ def _export_chat_pdf(messages: list[dict]) -> bytes:
 
     # Title
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "Conversation Export", ln=True)
+    pdf.cell(0, 10, "Conversation Export", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 6, _safe(datetime.now().strftime("%Y-%m-%d %H:%M")), ln=True)
+    ts = _safe(datetime.now().strftime("%Y-%m-%d %H:%M"))
+    pdf.cell(0, 6, ts, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
 
@@ -415,7 +420,7 @@ def _export_chat_pdf(messages: list[dict]) -> bytes:
             pdf.set_text_color(80, 80, 80)
         else:
             pdf.set_text_color(224, 123, 57)
-        pdf.cell(0, 6, "You:" if is_user else "Assistant:", ln=True)
+        pdf.cell(0, 6, "You:" if is_user else "Assistant:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_text_color(0, 0, 0)
         # Content — keep [N] markers so inline citations are visible in the PDF
         content = msg["content"].strip()
@@ -495,7 +500,7 @@ def _colorize_refs(text: str) -> str:
     """Wrap [N] citation markers with a coloured bold span."""
     return re.sub(
         r"\[(\d+)\]",
-        lambda m: f'<span style="color:{_CITE_COLOUR};font-weight:bold;">[{m.group(1)}]</span>',
+        lambda m: f'<span style="color:{_ORANGE};font-weight:bold;">[{m.group(1)}]</span>',
         text,
     )
 
@@ -516,7 +521,7 @@ def _citation_line(cite: dict) -> str:
         [cite["location"]] if cite.get("location") else []
     )
 
-    badge = f'<span style="color:{_CITE_COLOUR};font-weight:bold;">[{num}]</span>'
+    badge = f'<span style="color:{_ORANGE};font-weight:bold;">[{num}]</span>'
 
     if locations and locations[0].startswith("http"):
         if src_type == "YouTube" and len(locations) > 1:

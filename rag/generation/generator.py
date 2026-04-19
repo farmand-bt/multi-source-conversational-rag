@@ -37,18 +37,7 @@ class Generator:
         context_docs: list[Document],
         history: list[dict] | None = None,
     ) -> str:
-        context = self._build_context(context_docs)
-        messages: list = [SystemMessage(content=_SYSTEM_PROMPT)]
-
-        for turn in history or []:
-            role = turn.get("role", "")
-            content = turn.get("content", "")
-            if role == "user":
-                messages.append(HumanMessage(content=content))
-            elif role == "assistant":
-                messages.append(AIMessage(content=content))
-
-        messages.append(HumanMessage(content=_USER_TEMPLATE.format(context=context, query=query)))
+        messages = self._build_messages(query, context_docs, history)
         response = self._llm.invoke(messages)
         return response.content
 
@@ -59,9 +48,19 @@ class Generator:
         history: list[dict] | None = None,
     ) -> Iterator[str]:
         """Yield response tokens one at a time via the LLM streaming API."""
+        messages = self._build_messages(query, context_docs, history)
+        for chunk in self._llm.stream(messages):
+            yield chunk.content
+
+    def _build_messages(
+        self,
+        query: str,
+        context_docs: list[Document],
+        history: list[dict] | None = None,
+    ) -> list:
+        """Build the full message list: system prompt + history turns + current query."""
         context = self._build_context(context_docs)
         messages: list = [SystemMessage(content=_SYSTEM_PROMPT)]
-
         for turn in history or []:
             role = turn.get("role", "")
             content = turn.get("content", "")
@@ -69,10 +68,8 @@ class Generator:
                 messages.append(HumanMessage(content=content))
             elif role == "assistant":
                 messages.append(AIMessage(content=content))
-
         messages.append(HumanMessage(content=_USER_TEMPLATE.format(context=context, query=query)))
-        for chunk in self._llm.stream(messages):
-            yield chunk.content
+        return messages
 
     def _build_context(self, docs: list[Document]) -> str:
         parts = []
@@ -84,7 +81,7 @@ class Generator:
     @staticmethod
     def _format_header(doc: Document) -> str:
         """Format the source header shown to the LLM so it knows which citation tag to use."""
-        if doc.source_type == "pdf":
+        if doc.source_type in ("pdf", "arxiv"):
             page = doc.page_number or "?"
             return f"[PDF: {doc.source_name}, page {page}]"
         if doc.source_type == "youtube":
@@ -102,8 +99,16 @@ class Generator:
 
 
 def _ts_to_seconds(ts: str) -> int:
-    """Convert MM:SS or H:MM:SS timestamp string to total seconds."""
-    parts = [int(p) for p in ts.split(":")]
-    if len(parts) == 3:
-        return parts[0] * 3600 + parts[1] * 60 + parts[2]
-    return parts[0] * 60 + parts[1]
+    """Convert MM:SS or H:MM:SS timestamp string to total seconds.
+
+    Returns 0 for malformed timestamps so a URL can still be constructed.
+    """
+    try:
+        parts = [int(p) for p in ts.split(":")]
+        if len(parts) == 3:
+            return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        if len(parts) == 2:
+            return parts[0] * 60 + parts[1]
+        return parts[0]  # bare seconds
+    except (ValueError, IndexError):
+        return 0

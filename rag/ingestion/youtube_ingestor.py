@@ -1,5 +1,6 @@
 import hashlib
 import json
+import urllib.parse
 import urllib.request
 from urllib.parse import parse_qs, urlparse
 
@@ -100,9 +101,8 @@ def _extract_video_id(source: str) -> str:
 
 def _fetch_title(video_id: str) -> str | None:
     """Fetch the video title from the YouTube oEmbed endpoint (no API key required)."""
-    oembed_url = (
-        f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
-    )
+    video_url = urllib.parse.quote(f"https://www.youtube.com/watch?v={video_id}", safe="")
+    oembed_url = f"https://www.youtube.com/oembed?url={video_url}&format=json"
     try:
         with urllib.request.urlopen(oembed_url, timeout=5) as resp:
             data = json.loads(resp.read().decode())

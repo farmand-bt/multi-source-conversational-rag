@@ -223,7 +223,6 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 |---|---|---|---|
 | **Hybrid search** (BM25 + vector) | Add `rank_bm25` for keyword retrieval; merge scores with reciprocal rank fusion before the cross-encoder step | Medium (2–3 days) | Free — local |
 | **More source types** (Notion, Google Docs) | `notion-client` (Notion API token); `google-api-python-client` (OAuth2). Each is a new `Ingestor` subclass | Medium per source | Free tiers available; Google Docs requires OAuth setup |
-| **Streaming LLM responses** | Replace `generator.generate()` with LangChain's `stream()`; render token-by-token with Streamlit's `st.write_stream()` (v1.31+). Citation marker parsing must be deferred to stream end | Low–Medium (1–2 days) | Free |
 | **User authentication** | Per-session data isolation is already implemented (ephemeral in-memory ChromaDB per session). Remaining work: login/access control via Streamlit Community Cloud viewer auth (Google/GitHub) or `streamlit-authenticator` | Medium | Streamlit Cloud free tier supports viewer auth |
 
 ---
