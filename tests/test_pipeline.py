@@ -9,6 +9,7 @@ from rag.chunking.chunker import Chunker
 from rag.ingestion.base import Document
 from rag.models import Answer
 from rag.pipeline import RAGPipeline
+from rag.retrieval.bm25_index import BM25Index
 from rag.retrieval.retriever import Retriever
 from rag.vectorstore.chroma_store import ChromaStore
 
@@ -40,12 +41,14 @@ class _MockMemory:
 
 def _build_pipeline(tmp_path, embedder):
     store = ChromaStore(persist_dir=str(tmp_path / "chroma"))
+    bm25_index = BM25Index()
     pipeline = RAGPipeline.__new__(RAGPipeline)
     pipeline._embedder = embedder
     pipeline._chunker = Chunker()
     pipeline._store = store
+    pipeline._bm25_index = bm25_index
     pipeline._pdf_ingestor = None  # not needed for read-path tests
-    pipeline._retriever = Retriever(embedder, store)
+    pipeline._retriever = Retriever(embedder, store, bm25_index)
     pipeline._generator = _MockGenerator()
     pipeline._memory = _MockMemory()
     return pipeline
@@ -65,6 +68,7 @@ def _seed(pipeline, texts: list[str], source_id: str = "seed001") -> None:
     ]
     embs = pipeline._embedder.embed_documents([d.text for d in docs])
     pipeline._store.add(docs, embs)
+    pipeline._bm25_index.add(docs)
 
 
 # ------------------------------------------------------------------
@@ -113,7 +117,7 @@ def test_ask_uses_rewritten_query_for_retrieval(tmp_path, embedder):
     retrieved_queries = []
 
     class _CapturingRetriever:
-        def retrieve(self, query, top_k=5, rerank=False, max_chunks_per_source=3):
+        def retrieve(self, query, top_k=5, rerank=False, hybrid=False, max_chunks_per_source=3):
             retrieved_queries.append(query)
             return []
 
@@ -139,7 +143,7 @@ def test_ask_no_history_skips_rewriting(tmp_path, embedder):
     retrieved_queries = []
 
     class _CapturingRetriever:
-        def retrieve(self, query, top_k=5, rerank=False, max_chunks_per_source=3):
+        def retrieve(self, query, top_k=5, rerank=False, hybrid=False, max_chunks_per_source=3):
             retrieved_queries.append(query)
             return []
 

@@ -11,6 +11,7 @@ from rag.ingestion.web_ingestor import WebIngestor
 from rag.ingestion.youtube_ingestor import YouTubeIngestor
 from rag.memory.conversation import ConversationMemory
 from rag.models import Answer
+from rag.retrieval.bm25_index import BM25Index
 from rag.retrieval.retriever import Retriever
 from rag.vectorstore.chroma_store import ChromaStore
 
@@ -40,7 +41,8 @@ class RAGPipeline:
         self._yt_ingestor = YouTubeIngestor()
         self._arxiv_ingestor = ArXivIngestor()
         self._text_ingestor = TextIngestor()
-        self._retriever = Retriever(self._embedder, self._store)
+        self._bm25_index = BM25Index()
+        self._retriever = Retriever(self._embedder, self._store, self._bm25_index)
         self._generator: Generator | None = None  # lazy: avoids startup failure without GWDG creds
         self._memory = ConversationMemory()
 
@@ -75,14 +77,17 @@ class RAGPipeline:
         chunks = self._chunker.chunk(docs)
         embeddings = self._embedder.embed_documents([c.text for c in chunks])
         self._store.add(chunks, embeddings)
+        self._bm25_index.add(chunks)
         return len(chunks)
 
     def delete_source(self, source_id: str) -> None:
         self._store.delete(source_id)
+        self._bm25_index.delete(source_id)
 
     def delete_all_sources(self) -> None:
-        """Remove every ingested chunk from the vector store."""
+        """Remove every ingested chunk from the vector store and keyword index."""
         self._store.delete_all()
+        self._bm25_index.delete_all()
 
     # ------------------------------------------------------------------
     # Read
@@ -106,12 +111,17 @@ class RAGPipeline:
         self,
         query: str,
         rerank: bool = False,
+        hybrid: bool = False,
         top_k: int = TOP_K,
         max_chunks_per_source: int = MAX_CHUNKS_PER_SOURCE,
     ) -> list:
         """Embed *query* and return the top-k most relevant Document objects."""
         results = self._retriever.retrieve(
-            query, top_k=top_k, rerank=rerank, max_chunks_per_source=max_chunks_per_source
+            query,
+            top_k=top_k,
+            rerank=rerank,
+            hybrid=hybrid,
+            max_chunks_per_source=max_chunks_per_source,
         )
         return [doc for doc, _ in results]
 
@@ -150,14 +160,20 @@ class RAGPipeline:
     # High-level convenience (used by tests and non-UI callers)
     # ------------------------------------------------------------------
 
-    def ask(self, query: str, history: list[dict] | None = None, rerank: bool = False) -> Answer:
+    def ask(
+        self,
+        query: str,
+        history: list[dict] | None = None,
+        rerank: bool = False,
+        hybrid: bool = False,
+    ) -> Answer:
         """Rewrite → retrieve → generate in a single call.
 
         The original query + full history is sent to the generator so the LLM
         answers in conversational context even when the retrieval query was rewritten.
         """
         rewritten = self.rewrite_query(query, history)
-        docs = self.retrieve(rewritten, rerank=rerank)
+        docs = self.retrieve(rewritten, rerank=rerank, hybrid=hybrid)
         rewritten_for_display = rewritten if rewritten != query else ""
         return self.generate(query, docs, history, rewritten_query=rewritten_for_display)
 

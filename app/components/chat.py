@@ -109,9 +109,10 @@ def render_chat(pipeline: RAGPipeline) -> None:
             st.write(prompt)
 
         rerank = st.session_state.get("use_reranking", False)
+        hybrid = st.session_state.get("use_hybrid", False)
         top_k = st.session_state.get("top_k", TOP_K)
         max_chunks = st.session_state.get("max_chunks_per_source", MAX_CHUNKS_PER_SOURCE)
-        answer = _run_pipeline(pipeline, prompt, history, rerank, top_k, max_chunks)
+        answer = _run_pipeline(pipeline, prompt, history, rerank, hybrid, top_k, max_chunks)
 
         clean_text, numbered = _number_citations(answer)
         st.session_state.messages.append(
@@ -141,6 +142,7 @@ def _run_pipeline(
     prompt: str,
     history: list[dict],
     rerank: bool,
+    hybrid: bool = False,
     top_k: int = TOP_K,
     max_chunks_per_source: int = MAX_CHUNKS_PER_SOURCE,
 ) -> Answer:
@@ -151,7 +153,14 @@ def _run_pipeline(
     streams directly into an assistant chat bubble word-by-word.
     """
     has_history = bool(history)
-    retrieve_label = "Retrieve & Re-rank" if rerank else "Retrieve"
+    if rerank and hybrid:
+        retrieve_label = "Hybrid Retrieve & Re-rank"
+    elif hybrid:
+        retrieve_label = "Hybrid Retrieve"
+    elif rerank:
+        retrieve_label = "Retrieve & Re-rank"
+    else:
+        retrieve_label = "Retrieve"
 
     # Generate is intentionally omitted from the card — the streaming
     # output itself serves as the visual indicator for that step.
@@ -186,7 +195,11 @@ def _run_pipeline(
     steps[retrieve_idx]["state"] = "active"
     _render()
     docs = pipeline.retrieve(
-        rewritten, rerank=rerank, top_k=top_k, max_chunks_per_source=max_chunks_per_source
+        rewritten,
+        rerank=rerank,
+        hybrid=hybrid,
+        top_k=top_k,
+        max_chunks_per_source=max_chunks_per_source,
     )
     steps[retrieve_idx]["state"] = "done"
     n = len(docs)

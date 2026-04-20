@@ -39,6 +39,7 @@ CHUNK_OVERLAP = 50
 TOP_K = 5
 MAX_CHUNKS_PER_SOURCE = 3  # max chunks retrieved from any single source (ensures diversity)
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # local cross-encoder, no API needed
+RRF_K = 60  # Reciprocal Rank Fusion constant: score = 1 / (k + rank)
 
 # Memory
 MAX_HISTORY_TURNS = 10

@@ -65,6 +65,7 @@ The demo walks through the full pipeline end-to-end:
 | **Conversational memory** | Follow-up questions resolved via LLM query rewriting before retrieval |
 | **Source citations** | Numbered `[1]`, `[2]` inline citations with a collapsible Sources expander; YouTube links are timestamped |
 | **Re-ranking (opt-in)** | Cross-encoder (`ms-marco-MiniLM-L-6-v2`) re-scores retrieved chunks — runs locally, no API needed |
+| **Hybrid search (opt-in)** | BM25 keyword search fused with dense vector search via Reciprocal Rank Fusion — improves recall for exact keyword queries |
 | **Retrieval tuning** | Top K chunks (3–15) and max-per-source cap (1–5) are adjustable via sidebar sliders per query |
 | **Live pipeline display** | Step-by-step progress card (Rewrite → Retrieve → Generate) visible while the model thinks |
 | **Export conversation** | Download the full chat as a PDF with one click |
@@ -221,7 +222,6 @@ uv run python scripts/reset_vectorstore.py   # wipe ChromaDB and start fresh
 
 | Improvement | How | Effort | Cost |
 |---|---|---|---|
-| **Hybrid search** (BM25 + vector) | Add `rank_bm25` for keyword retrieval; merge scores with reciprocal rank fusion before the cross-encoder step | Medium (2–3 days) | Free — local |
 | **More source types** (Notion, Google Docs) | `notion-client` (Notion API token); `google-api-python-client` (OAuth2). Each is a new `Ingestor` subclass | Medium per source | Free tiers available; Google Docs requires OAuth setup |
 | **User authentication** | Per-session data isolation is already implemented (ephemeral in-memory ChromaDB per session). Remaining work: login/access control via Streamlit Community Cloud viewer auth (Google/GitHub) or `streamlit-authenticator` | Medium | Streamlit Cloud free tier supports viewer auth |
 

@@ -194,6 +194,15 @@ def render_sidebar(pipeline: RAGPipeline) -> None:
                 "but adds ~1–3 s latency. Runs locally — no extra API calls."
             ),
         )
+        st.toggle(
+            "Hybrid search (BM25)",
+            key="use_hybrid",
+            help=(
+                "Combines dense vector search with BM25 keyword matching using "
+                "Reciprocal Rank Fusion. Improves results for keyword-specific "
+                "queries (exact terms, names, codes). Adds negligible latency."
+            ),
+        )
         st.slider(
             "Top K chunks",
             min_value=3,
