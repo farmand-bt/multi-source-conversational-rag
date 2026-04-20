@@ -1,3 +1,4 @@
+import time
 import chromadb
 
 from config.settings import CHROMA_PERSIST_DIR
@@ -20,7 +21,17 @@ class ChromaStore:
         # keeps collections fully isolated without requiring separate processes.
         self._collection_name = collection_name
         if ephemeral:
-            self._client = chromadb.EphemeralClient()
+            # ChromaDB 1.5.x has a race condition in its Rust shared-system client
+            # on cold start (KeyError/'RustBindingsAPI has no attribute bindings').
+            # A single retry after a short wait is enough to recover.
+            for attempt in range(2):
+                try:
+                    self._client = chromadb.EphemeralClient()
+                    break
+                except (KeyError, AttributeError, ValueError):
+                    if attempt == 1:
+                        raise
+                    time.sleep(0.2)
         else:
             path = persist_dir or CHROMA_PERSIST_DIR
             self._client = chromadb.PersistentClient(path=path)
