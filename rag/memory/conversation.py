@@ -71,9 +71,14 @@ class ConversationMemory:
         history_text = "\n".join(lines)
 
         prompt = _REWRITE_PROMPT.format(history=history_text, question=query)
-        response = self._get_llm().invoke([HumanMessage(content=prompt)])
-        rewritten = response.content.strip()
-        return rewritten if rewritten else query
+        try:
+            response = self._get_llm().invoke([HumanMessage(content=prompt)])
+            rewritten = response.content.strip()
+            return rewritten if rewritten else query
+        except Exception:
+            # If the LLM call fails (network error, rate limit, etc.),
+            # fall back to the original query rather than crashing the pipeline.
+            return query
 
     # ------------------------------------------------------------------
     # Helpers
